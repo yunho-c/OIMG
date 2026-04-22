@@ -612,6 +612,7 @@ void main() {
       find.byKey(const ValueKey('preview-mode-Difference')),
       findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('preview-mode-Heatmap')), findsOneWidget);
     expect(slimg.differenceCallCount, 0);
 
     await tester.pump(const Duration(seconds: 5));
@@ -655,6 +656,192 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('preview-mode-Difference')));
     await tester.pump();
     expect(slimg.differenceCallCount, 1);
+  });
+
+  testWidgets('heatmap mode reuses the shared diff fetch and shows controls', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final slimg = _FakeSlimgApi(
+      inspectResults: {'/tmp/first.png': _metadata('png', 2400)},
+    )..differenceDelay = const Duration(milliseconds: 100);
+    final controller = FileOpenController(
+      channel: _FakeFileOpenChannel(),
+      slimg: slimg,
+      initialPaths: const ['/tmp/first.png'],
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(_buildApp(controller: controller, slimg: slimg));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(
+      find.byKey(const ValueKey('heatmap-palette-selector')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('heatmap-visibility-checkbox')),
+      findsNothing,
+    );
+    expect(slimg.differenceCallCount, 0);
+
+    await tester.tap(find.byKey(const ValueKey('preview-mode-Heatmap')));
+    await tester.pump();
+
+    expect(slimg.differenceCallCount, 1);
+    expect(
+      find.byKey(const ValueKey('heatmap-palette-selector')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('heatmap-visibility-checkbox')),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(milliseconds: 120));
+
+    await tester.tap(find.byKey(const ValueKey('heatmap-palette-Inferno')));
+    await tester.pump();
+    expect(slimg.differenceCallCount, 1);
+
+    await tester.tap(find.byKey(const ValueKey('heatmap-visibility-checkbox')));
+    await tester.pump();
+    expect(slimg.differenceCallCount, 1);
+  });
+
+  testWidgets('heatmap mode follows quality changes without reselecting', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final slimg = _FakeSlimgApi(
+      inspectResults: {'/tmp/first.png': _metadata('png', 2400)},
+    );
+    final controller = FileOpenController(
+      channel: _FakeFileOpenChannel(),
+      slimg: slimg,
+      initialPaths: const ['/tmp/first.png'],
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(_buildApp(controller: controller, slimg: slimg));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.tap(find.byKey(const ValueKey('preview-mode-Heatmap')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+
+    expect(slimg.differenceCallCount, 1);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MyApp)),
+    );
+    await container.read(appSettingsProvider.notifier).setQuality(70);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 220));
+
+    expect(slimg.previewCallCount, 2);
+    expect(slimg.differenceCallCount, 2);
+    expect(
+      container.read(currentPreviewDisplayModeProvider),
+      PreviewDisplayMode.heatmap,
+    );
+  });
+
+  testWidgets('heatmap mode preserves selection while hovering analyze chart', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final slimg = _FakeSlimgApi(
+      inspectResults: {'/tmp/first.png': _metadata('png', 2400)},
+    )..analyzeSampleDelay = const Duration(milliseconds: 20);
+    final controller = FileOpenController(
+      channel: _FakeFileOpenChannel(),
+      slimg: slimg,
+      initialPaths: const ['/tmp/first.png'],
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(_buildApp(controller: controller, slimg: slimg));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.tap(find.byKey(const ValueKey('preview-mode-Heatmap')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(slimg.differenceCallCount, 1);
+
+    await tester.tap(find.widgetWithText(OutlineButton, 'Analyze'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 260));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(slimg.differenceCallCount, 2);
+
+    final chart = tester.widget<LineChart>(find.byType(LineChart));
+    final firstBar = chart.data.lineBarsData.first;
+    final firstSpot = firstBar.spots.first;
+    chart.data.lineTouchData.touchCallback?.call(
+      FlPointerHoverEvent(const PointerHoverEvent(position: Offset.zero)),
+      LineTouchResponse(
+        touchLocation: Offset.zero,
+        touchChartCoordinate: Offset.zero,
+        lineBarSpots: [TouchLineBarSpot(firstBar, 0, firstSpot, 0)],
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MyApp)),
+    );
+    expect(slimg.differenceCallCount, 3);
+    expect(
+      container.read(currentPreviewDisplayModeProvider),
+      PreviewDisplayMode.heatmap,
+    );
+  });
+
+  testWidgets('heatmap controls wrap without overflow on narrower widths', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1120, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final slimg = _FakeSlimgApi(
+      inspectResults: {'/tmp/first.png': _metadata('png', 2400)},
+    );
+    final controller = FileOpenController(
+      channel: _FakeFileOpenChannel(),
+      slimg: slimg,
+      initialPaths: const ['/tmp/first.png'],
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(_buildApp(controller: controller, slimg: slimg));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.tap(find.byKey(const ValueKey('preview-mode-Heatmap')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const ValueKey('heatmap-palette-selector')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('heatmap-visibility-checkbox')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('switching back to a file reuses cached preview and metrics', (

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -18,6 +19,7 @@ import 'optimization_plan.dart';
 final slimgApiProvider = Provider<SlimgApi>((ref) => const FrbSlimgApi());
 int _previewRequestSequence = 0;
 int _previewDifferenceRequestSequence = 0;
+int _previewHeatmapRequestSequence = 0;
 int _previewPixelMatchRequestSequence = 0;
 int _previewMsSsimRequestSequence = 0;
 int _previewSsimulacra2RequestSequence = 0;
@@ -39,7 +41,11 @@ const int _previewCacheBudgetBytes = 128 * 1024 * 1024;
 const int _previewDecodedImageBudget = 2;
 const int _previewCacheEntryOverheadBytes = 4 * 1024;
 
-enum PreviewDisplayMode { original, optimized, difference }
+enum PreviewDisplayMode { original, optimized, difference, heatmap }
+
+enum HeatmapPalette { turbo, inferno, viridis }
+
+enum HeatmapVisibilityMode { overlay, nonzero, opaque }
 
 enum _PreviewMetricKind { pixelMatch, msSsim, ssimulacra2 }
 
@@ -361,6 +367,24 @@ class PreviewDifferenceRequestNotifier extends Notifier<String?> {
 
   void requestForArtifact(String artifactId) {
     state = artifactId;
+  }
+}
+
+class HeatmapPaletteNotifier extends Notifier<HeatmapPalette> {
+  @override
+  HeatmapPalette build() => HeatmapPalette.turbo;
+
+  void select(HeatmapPalette palette) {
+    state = palette;
+  }
+}
+
+class HeatmapVisibilityModeNotifier extends Notifier<HeatmapVisibilityMode> {
+  @override
+  HeatmapVisibilityMode build() => HeatmapVisibilityMode.overlay;
+
+  void select(HeatmapVisibilityMode mode) {
+    state = mode;
   }
 }
 
@@ -1052,6 +1076,16 @@ final previewDifferenceRequestProvider =
       PreviewDifferenceRequestNotifier.new,
     );
 
+final heatmapPaletteProvider =
+    NotifierProvider<HeatmapPaletteNotifier, HeatmapPalette>(
+      HeatmapPaletteNotifier.new,
+    );
+
+final heatmapVisibilityModeProvider =
+    NotifierProvider<HeatmapVisibilityModeNotifier, HeatmapVisibilityMode>(
+      HeatmapVisibilityModeNotifier.new,
+    );
+
 final currentPreviewDisplayModeProvider =
     Provider.autoDispose<PreviewDisplayMode>((ref) {
       final controller = ref.watch(fileOpenControllerProvider);
@@ -1086,6 +1120,10 @@ final currentPreviewDisplayModeProvider =
           case PreviewDisplayMode.difference:
             return supportsDifference
                 ? PreviewDisplayMode.difference
+                : PreviewDisplayMode.original;
+          case PreviewDisplayMode.heatmap:
+            return supportsDifference
+                ? PreviewDisplayMode.heatmap
                 : PreviewDisplayMode.original;
         }
       }
@@ -1141,7 +1179,13 @@ final currentPreviewDifferenceFrameProvider = FutureProvider.autoDispose<Preview
       return null;
     }
     final requestedArtifactId = ref.watch(previewDifferenceRequestProvider);
-    if (requestedArtifactId != context.request.artifactId) {
+    final displayMode = ref.watch(currentPreviewDisplayModeProvider);
+    final isActiveDiffVisualization = switch (displayMode) {
+      PreviewDisplayMode.difference || PreviewDisplayMode.heatmap => true,
+      _ => false,
+    };
+    if (!isActiveDiffVisualization &&
+        requestedArtifactId != context.request.artifactId) {
       return null;
     }
     final cacheKey = context.cacheKey;
@@ -1227,6 +1271,67 @@ final currentPreviewDifferenceFrameProvider = FutureProvider.autoDispose<Preview
   }
 });
 
+final currentPreviewHeatmapFrameProvider =
+    FutureProvider.autoDispose<PreviewDifferenceFrame?>((ref) async {
+      final requestId = ++_previewHeatmapRequestSequence;
+      final totalStopwatch = Stopwatch()..start();
+      ref.onDispose(() {
+        DeveloperDiagnostics.logTiming(
+          'preview-heatmap:$requestId',
+          'disposed total=${totalStopwatch.elapsedMilliseconds}ms',
+        );
+      });
+
+      try {
+        final displayMode = ref.watch(currentPreviewDisplayModeProvider);
+        if (displayMode != PreviewDisplayMode.heatmap) {
+          return null;
+        }
+
+        final palette = ref.watch(heatmapPaletteProvider);
+        final visibilityMode = ref.watch(heatmapVisibilityModeProvider);
+        final differenceFrame = await ref.watch(
+          currentPreviewDifferenceFrameProvider.future,
+        );
+        if (differenceFrame == null) {
+          return null;
+        }
+
+        DeveloperDiagnostics.logTiming(
+          'preview-heatmap:$requestId',
+          'start palette=${palette.name} visibility=${visibilityMode.name}',
+        );
+        final heatmapStopwatch = Stopwatch()..start();
+        final rawImage = differenceFrame.rawImage;
+        final image = await _decodeRawImage(
+          RawImageResult(
+            rgbaBytes: _buildHeatmapRgba(
+              rawImage.rgbaBytes,
+              palette: palette,
+              visibilityMode: visibilityMode,
+            ),
+            width: rawImage.width,
+            height: rawImage.height,
+          ),
+        );
+        heatmapStopwatch.stop();
+        totalStopwatch.stop();
+        DeveloperDiagnostics.logTiming(
+          'preview-heatmap:$requestId',
+          'done image=${heatmapStopwatch.elapsedMilliseconds}ms total=${totalStopwatch.elapsedMilliseconds}ms',
+        );
+        ref.onDispose(image.dispose);
+        return PreviewDifferenceFrame(image: image, rawImage: rawImage);
+      } on Object catch (error, stackTrace) {
+        DeveloperDiagnostics.logTimingError(
+          'preview-heatmap:$requestId',
+          error,
+          stackTrace,
+        );
+        rethrow;
+      }
+    });
+
 Future<ui.Image> _decodeRawImage(RawImageResult result) {
   final completer = Completer<ui.Image>();
   ui.decodeImageFromPixels(
@@ -1238,6 +1343,106 @@ Future<ui.Image> _decodeRawImage(RawImageResult result) {
   );
   return completer.future;
 }
+
+Uint8List _buildHeatmapRgba(
+  Uint8List diffRgbaBytes, {
+  required HeatmapPalette palette,
+  required HeatmapVisibilityMode visibilityMode,
+}) {
+  final output = Uint8List(diffRgbaBytes.length);
+  for (var i = 0; i < diffRgbaBytes.length; i += 4) {
+    final intensity =
+        math.max(
+          diffRgbaBytes[i],
+          math.max(diffRgbaBytes[i + 1], diffRgbaBytes[i + 2]),
+        ) /
+        255.0;
+    if (visibilityMode != HeatmapVisibilityMode.opaque && intensity <= 0) {
+      continue;
+    }
+
+    final color = _sampleHeatmapPalette(palette, intensity);
+    output[i] = color.$1;
+    output[i + 1] = color.$2;
+    output[i + 2] = color.$3;
+    output[i + 3] = switch (visibilityMode) {
+      HeatmapVisibilityMode.overlay => (intensity * 0.7 * 255).round().clamp(
+        0,
+        255,
+      ),
+      HeatmapVisibilityMode.nonzero => 255,
+      HeatmapVisibilityMode.opaque => 255,
+    };
+  }
+  return output;
+}
+
+(int, int, int) _sampleHeatmapPalette(
+  HeatmapPalette palette,
+  double intensity,
+) {
+  final t = intensity.clamp(0.0, 1.0);
+  final stops = switch (palette) {
+    HeatmapPalette.turbo => _turboStops,
+    HeatmapPalette.inferno => _infernoStops,
+    HeatmapPalette.viridis => _viridisStops,
+  };
+
+  for (var index = 1; index < stops.length; index += 1) {
+    final current = stops[index];
+    if (t <= current.position) {
+      final previous = stops[index - 1];
+      final span = current.position - previous.position;
+      final localT = span <= 0 ? 0.0 : (t - previous.position) / span;
+      return (
+        _lerpChannel(previous.red, current.red, localT),
+        _lerpChannel(previous.green, current.green, localT),
+        _lerpChannel(previous.blue, current.blue, localT),
+      );
+    }
+  }
+
+  final last = stops.last;
+  return (last.red, last.green, last.blue);
+}
+
+int _lerpChannel(int a, int b, double t) => (a + ((b - a) * t)).round();
+
+class _PaletteStop {
+  const _PaletteStop(this.position, this.red, this.green, this.blue);
+
+  final double position;
+  final int red;
+  final int green;
+  final int blue;
+}
+
+const _turboStops = <_PaletteStop>[
+  _PaletteStop(0.0, 48, 18, 59),
+  _PaletteStop(0.2, 50, 99, 190),
+  _PaletteStop(0.4, 34, 181, 115),
+  _PaletteStop(0.6, 247, 209, 61),
+  _PaletteStop(0.8, 239, 93, 35),
+  _PaletteStop(1.0, 122, 4, 3),
+];
+
+const _infernoStops = <_PaletteStop>[
+  _PaletteStop(0.0, 0, 0, 4),
+  _PaletteStop(0.2, 43, 11, 84),
+  _PaletteStop(0.4, 120, 28, 109),
+  _PaletteStop(0.6, 187, 55, 84),
+  _PaletteStop(0.8, 249, 142, 8),
+  _PaletteStop(1.0, 252, 255, 164),
+];
+
+const _viridisStops = <_PaletteStop>[
+  _PaletteStop(0.0, 68, 1, 84),
+  _PaletteStop(0.2, 64, 67, 135),
+  _PaletteStop(0.4, 41, 120, 142),
+  _PaletteStop(0.6, 34, 168, 132),
+  _PaletteStop(0.8, 122, 209, 81),
+  _PaletteStop(1.0, 253, 231, 37),
+];
 
 final currentPreviewPixelMatchProvider =
     FutureProvider.autoDispose<PreviewMetricResult?>((ref) async {

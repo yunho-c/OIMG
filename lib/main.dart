@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -682,6 +683,8 @@ class _ImageStage extends ConsumerWidget {
     final optimizedDisplay = ref.watch(currentOptimizedDisplayProvider);
     final displayMode = ref.watch(currentPreviewDisplayModeProvider);
     final differenceFrame = ref.watch(currentPreviewDifferenceFrameProvider);
+    final heatmapFrame = ref.watch(currentPreviewHeatmapFrameProvider);
+    final heatmapVisibilityMode = ref.watch(heatmapVisibilityModeProvider);
     final hasOptimizedPreview = optimizedDisplay != null;
     final planData = plan.maybeWhen(data: (value) => value, orElse: () => null);
     final differenceUnavailableTooltip =
@@ -734,11 +737,25 @@ class _ImageStage extends ConsumerWidget {
           );
     }
 
+    void selectHeatmap() {
+      if (!supportsDifference) {
+        return;
+      }
+      final artifactId = optimizedDisplay.artifactId;
+      ref
+          .read(previewDifferenceRequestProvider.notifier)
+          .requestForArtifact(artifactId);
+      ref
+          .read(previewDisplaySelectionProvider.notifier)
+          .select(filePath: currentFile.path, mode: PreviewDisplayMode.heatmap);
+    }
+
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.keyR): selectOriginal,
         const SingleActivator(LogicalKeyboardKey.keyE): selectOptimized,
         const SingleActivator(LogicalKeyboardKey.keyD): selectDifference,
+        const SingleActivator(LogicalKeyboardKey.keyH): selectHeatmap,
       },
       child: Focus(
         autofocus: true,
@@ -894,6 +911,48 @@ class _ImageStage extends ConsumerWidget {
                             unavailableMessage:
                                 'Difference preview unavailable.',
                           );
+                        case PreviewDisplayMode.heatmap:
+                          return HeatmapPreview(
+                            retentionScopeKey: currentFile.path,
+                            frame: heatmapFrame,
+                            fileName: fileName,
+                            showCoordinates:
+                                appSettings
+                                    ?.differenceTooltipShowsCoordinates ??
+                                true,
+                            useRgbSwatches:
+                                appSettings?.differenceTooltipUsesSwatches ??
+                                false,
+                            backgroundPath:
+                                heatmapVisibilityMode ==
+                                        HeatmapVisibilityMode.overlay &&
+                                    optimizedDisplay?.usesOutputPath == true
+                                ? optimizedDisplay?.outputPath
+                                : null,
+                            backgroundEncodedBytes:
+                                heatmapVisibilityMode ==
+                                        HeatmapVisibilityMode.overlay &&
+                                    optimizedDisplay?.usesOutputPath != true
+                                ? optimizedDisplay?.encodedBytes
+                                : null,
+                            onShowCoordinatesChanged: (value) {
+                              unawaited(
+                                ref
+                                    .read(appSettingsProvider.notifier)
+                                    .setDifferenceTooltipShowsCoordinates(
+                                      value,
+                                    ),
+                              );
+                            },
+                            onUseRgbSwatchesChanged: (value) {
+                              unawaited(
+                                ref
+                                    .read(appSettingsProvider.notifier)
+                                    .setDifferenceTooltipUsesSwatches(value),
+                              );
+                            },
+                            unavailableMessage: 'Heatmap preview unavailable.',
+                          );
                       }
                     },
                     loading: () =>
@@ -918,6 +977,7 @@ class _ImageStage extends ConsumerWidget {
                   onSelectOriginal: selectOriginal,
                   onSelectOptimized: selectOptimized,
                   onSelectDifference: selectDifference,
+                  onSelectHeatmap: selectHeatmap,
                 ),
               ),
             ],
@@ -1051,7 +1111,7 @@ class _PreviewCanvas extends StatelessWidget {
   }
 }
 
-class DifferencePreview extends StatefulWidget {
+class DifferencePreview extends StatelessWidget {
   const DifferencePreview({
     super.key,
     required this.retentionScopeKey,
@@ -1074,7 +1134,63 @@ class DifferencePreview extends StatefulWidget {
   final String unavailableMessage;
 
   @override
-  State<DifferencePreview> createState() => _DifferencePreviewState();
+  Widget build(BuildContext context) {
+    return _DiffVisualizationPreview(
+      retentionScopeKey: retentionScopeKey,
+      frame: frame,
+      fileName: fileName,
+      showCoordinates: showCoordinates,
+      useRgbSwatches: useRgbSwatches,
+      onShowCoordinatesChanged: onShowCoordinatesChanged,
+      onUseRgbSwatchesChanged: onUseRgbSwatchesChanged,
+      unavailableMessage: unavailableMessage,
+      keyPrefix: 'difference-preview',
+    );
+  }
+}
+
+class HeatmapPreview extends StatelessWidget {
+  const HeatmapPreview({
+    super.key,
+    required this.retentionScopeKey,
+    required this.frame,
+    required this.fileName,
+    required this.showCoordinates,
+    required this.useRgbSwatches,
+    this.backgroundPath,
+    this.backgroundEncodedBytes,
+    this.onShowCoordinatesChanged,
+    this.onUseRgbSwatchesChanged,
+    this.unavailableMessage = 'Unable to render preview.',
+  });
+
+  final String retentionScopeKey;
+  final AsyncValue<PreviewDifferenceFrame?> frame;
+  final String fileName;
+  final bool showCoordinates;
+  final bool useRgbSwatches;
+  final String? backgroundPath;
+  final Uint8List? backgroundEncodedBytes;
+  final ValueChanged<bool>? onShowCoordinatesChanged;
+  final ValueChanged<bool>? onUseRgbSwatchesChanged;
+  final String unavailableMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DiffVisualizationPreview(
+      retentionScopeKey: retentionScopeKey,
+      frame: frame,
+      fileName: fileName,
+      showCoordinates: showCoordinates,
+      useRgbSwatches: useRgbSwatches,
+      backgroundPath: backgroundPath,
+      backgroundEncodedBytes: backgroundEncodedBytes,
+      onShowCoordinatesChanged: onShowCoordinatesChanged,
+      onUseRgbSwatchesChanged: onUseRgbSwatchesChanged,
+      unavailableMessage: unavailableMessage,
+      keyPrefix: 'heatmap-preview',
+    );
+  }
 }
 
 class _DifferenceTooltipSample {
@@ -1108,7 +1224,42 @@ class _DifferenceTooltipSample {
   }
 }
 
-class _DifferencePreviewState extends State<DifferencePreview> {
+class _DiffVisualizationPreview extends StatefulWidget {
+  const _DiffVisualizationPreview({
+    required this.retentionScopeKey,
+    required this.frame,
+    required this.fileName,
+    required this.showCoordinates,
+    required this.useRgbSwatches,
+    required this.keyPrefix,
+    this.backgroundPath,
+    this.backgroundEncodedBytes,
+    this.onShowCoordinatesChanged,
+    this.onUseRgbSwatchesChanged,
+    this.unavailableMessage = 'Unable to render preview.',
+  }) : assert(
+         (backgroundPath == null) || (backgroundEncodedBytes == null),
+         'Specify either a background path or background bytes.',
+       );
+
+  final String retentionScopeKey;
+  final AsyncValue<PreviewDifferenceFrame?> frame;
+  final String fileName;
+  final bool showCoordinates;
+  final bool useRgbSwatches;
+  final String keyPrefix;
+  final String? backgroundPath;
+  final Uint8List? backgroundEncodedBytes;
+  final ValueChanged<bool>? onShowCoordinatesChanged;
+  final ValueChanged<bool>? onUseRgbSwatchesChanged;
+  final String unavailableMessage;
+
+  @override
+  State<_DiffVisualizationPreview> createState() =>
+      _DiffVisualizationPreviewState();
+}
+
+class _DiffVisualizationPreviewState extends State<_DiffVisualizationPreview> {
   static const _tooltipDelay = Duration(seconds: 1);
   static const _tooltipOffset = Offset(12, 12);
   static const _rgbSwatchSlotWidth = 34.0;
@@ -1132,7 +1283,7 @@ class _DifferencePreviewState extends State<DifferencePreview> {
   }
 
   @override
-  void didUpdateWidget(covariant DifferencePreview oldWidget) {
+  void didUpdateWidget(covariant _DiffVisualizationPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.retentionScopeKey != widget.retentionScopeKey) {
       _clearRetainedFrame();
@@ -1341,21 +1492,21 @@ class _DifferencePreviewState extends State<DifferencePreview> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildRgbSwatchValue(
-                key: const ValueKey('difference-preview-tooltip-r-swatch'),
+                key: ValueKey('${widget.keyPrefix}-tooltip-r-swatch'),
                 color: const Color(0xFFFF3B30),
                 value: tooltip.redLabel,
                 textStyle: numberStyle,
               ),
               const SizedBox(width: 8),
               _buildRgbSwatchValue(
-                key: const ValueKey('difference-preview-tooltip-g-swatch'),
+                key: ValueKey('${widget.keyPrefix}-tooltip-g-swatch'),
                 color: const Color(0xFF34C759),
                 value: tooltip.greenLabel,
                 textStyle: numberStyle,
               ),
               const SizedBox(width: 8),
               _buildRgbSwatchValue(
-                key: const ValueKey('difference-preview-tooltip-b-swatch'),
+                key: ValueKey('${widget.keyPrefix}-tooltip-b-swatch'),
                 color: const Color(0xFF0A84FF),
                 value: tooltip.blueLabel,
                 textStyle: numberStyle,
@@ -1366,13 +1517,13 @@ class _DifferencePreviewState extends State<DifferencePreview> {
 
     if (!widget.showCoordinates) {
       return KeyedSubtree(
-        key: const ValueKey('difference-preview-tooltip'),
+        key: ValueKey('${widget.keyPrefix}-tooltip'),
         child: rgbContent,
       );
     }
 
     return KeyedSubtree(
-      key: const ValueKey('difference-preview-tooltip'),
+      key: ValueKey('${widget.keyPrefix}-tooltip'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -1484,7 +1635,7 @@ class _DifferencePreviewState extends State<DifferencePreview> {
                   onPointerDown: (_) => _resetTooltip(),
                   onPointerSignal: (_) => _resetTooltip(),
                   child: MouseRegion(
-                    key: const ValueKey('difference-preview-region'),
+                    key: ValueKey('${widget.keyPrefix}-region'),
                     onHover: (event) => _handleHover(
                       viewportOffset: event.localPosition,
                       viewportSize: viewportSize,
@@ -1504,7 +1655,41 @@ class _DifferencePreviewState extends State<DifferencePreview> {
                           child: SizedBox(
                             width: imageRect.width,
                             height: imageRect.height,
-                            child: RawImage(image: image, fit: BoxFit.fill),
+                            child:
+                                widget.backgroundPath != null ||
+                                    widget.backgroundEncodedBytes != null
+                                ? Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      if (widget.backgroundPath != null)
+                                        Image.file(
+                                          File(widget.backgroundPath!),
+                                          fit: BoxFit.fill,
+                                          gaplessPlayback: true,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return _ImageLoadError(
+                                                  fileName: widget.fileName,
+                                                );
+                                              },
+                                        )
+                                      else
+                                        Image.memory(
+                                          widget.backgroundEncodedBytes!,
+                                          fit: BoxFit.fill,
+                                          gaplessPlayback: true,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return _PreviewUnavailable(
+                                                  message:
+                                                      widget.unavailableMessage,
+                                                );
+                                              },
+                                        ),
+                                      RawImage(image: image, fit: BoxFit.fill),
+                                    ],
+                                  )
+                                : RawImage(image: image, fit: BoxFit.fill),
                           ),
                         ),
                       ),
@@ -1540,7 +1725,7 @@ class _DifferencePreviewState extends State<DifferencePreview> {
           return _PreviewUnavailable(message: widget.unavailableMessage);
         }
         return KeyedSubtree(
-          key: const ValueKey('difference-preview-ready'),
+          key: ValueKey('${widget.keyPrefix}-ready'),
           child: _buildImageViewport(
             image: _retainedImage ?? resolvedFrame.image,
             rawImage: resolvedFrame.rawImage,
@@ -1550,15 +1735,15 @@ class _DifferencePreviewState extends State<DifferencePreview> {
       loading: () {
         if (_retainedImage != null && _retainedRawImage != null) {
           return KeyedSubtree(
-            key: const ValueKey('difference-preview-ready'),
+            key: ValueKey('${widget.keyPrefix}-ready'),
             child: _buildImageViewport(
               image: _retainedImage!,
               rawImage: _retainedRawImage!,
             ),
           );
         }
-        return const Center(
-          key: ValueKey('difference-preview-loading'),
+        return Center(
+          key: ValueKey('${widget.keyPrefix}-loading'),
           child: CircularProgressIndicator(),
         );
       },
@@ -1792,6 +1977,7 @@ class _PreviewDisplayModeRow extends ConsumerWidget {
     required this.onSelectOriginal,
     required this.onSelectOptimized,
     required this.onSelectDifference,
+    required this.onSelectHeatmap,
   });
 
   final String filePath;
@@ -1803,19 +1989,25 @@ class _PreviewDisplayModeRow extends ConsumerWidget {
   final VoidCallback onSelectOriginal;
   final VoidCallback onSelectOptimized;
   final VoidCallback onSelectDifference;
+  final VoidCallback onSelectHeatmap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final preview = ref.watch(currentPreviewProvider);
     final differenceFrame = ref.watch(currentPreviewDifferenceFrameProvider);
+    final heatmapFrame = ref.watch(currentPreviewHeatmapFrameProvider);
     final analyzeState = ref.watch(analyzeRunControllerProvider);
     final analyzeAvailability = ref.watch(analyzeAvailabilityProvider);
     final analyzeController = ref.read(analyzeRunControllerProvider.notifier);
     final settings = ref.watch(appSettingsProvider).asData?.value;
+    final heatmapPalette = ref.watch(heatmapPaletteProvider);
+    final heatmapVisibilityMode = ref.watch(heatmapVisibilityModeProvider);
     final optimizedLoading = preview.isLoading && !hasOptimizedPreview;
     final differenceLoading =
         displayMode == PreviewDisplayMode.difference &&
         differenceFrame.isLoading;
+    final heatmapLoading =
+        displayMode == PreviewDisplayMode.heatmap && heatmapFrame.isLoading;
     final analyzeTooltip =
         !analyzeAvailability.isEnabled &&
             settings != null &&
@@ -1827,36 +2019,71 @@ class _PreviewDisplayModeRow extends ConsumerWidget {
 
     return Row(
       key: const ValueKey('preview-display-mode-row'),
-      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _PreviewDisplayModeButton(
-          shortcutKey: LogicalKeyboardKey.keyR,
-          label: 'Original',
-          selected: displayMode == PreviewDisplayMode.original,
-          enabled: true,
-          onPressed: onSelectOriginal,
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _PreviewDisplayModeButton(
+                shortcutKey: LogicalKeyboardKey.keyR,
+                label: 'Original',
+                selected: displayMode == PreviewDisplayMode.original,
+                enabled: true,
+                onPressed: onSelectOriginal,
+              ),
+              _PreviewDisplayModeButton(
+                shortcutKey: LogicalKeyboardKey.keyE,
+                label: 'Optimized',
+                selected: displayMode == PreviewDisplayMode.optimized,
+                enabled: hasOptimizedPreview,
+                tooltip: optimizedLoading ? 'Optimizing image...' : null,
+                loading: optimizedLoading,
+                onPressed: onSelectOptimized,
+              ),
+              _PreviewDisplayModeButton(
+                shortcutKey: LogicalKeyboardKey.keyD,
+                label: 'Difference',
+                selected: displayMode == PreviewDisplayMode.difference,
+                enabled: supportsDifference,
+                tooltip: differenceUnavailableTooltip,
+                loading: differenceLoading,
+                onPressed: onSelectDifference,
+              ),
+              _PreviewDisplayModeButton(
+                shortcutKey: LogicalKeyboardKey.keyH,
+                label: 'Heatmap',
+                selected: displayMode == PreviewDisplayMode.heatmap,
+                enabled: supportsDifference,
+                tooltip: differenceUnavailableTooltip,
+                loading: heatmapLoading,
+                onPressed: onSelectHeatmap,
+              ),
+              if (displayMode == PreviewDisplayMode.heatmap) ...[
+                const SizedBox(width: 4),
+                _HeatmapPaletteSelector(
+                  selectedPalette: heatmapPalette,
+                  onSelected: (nextPalette) {
+                    ref
+                        .read(heatmapPaletteProvider.notifier)
+                        .select(nextPalette);
+                  },
+                ),
+                _HeatmapVisibilityCheckbox(
+                  mode: heatmapVisibilityMode,
+                  onChanged: (nextMode) {
+                    ref
+                        .read(heatmapVisibilityModeProvider.notifier)
+                        .select(nextMode);
+                  },
+                ),
+              ],
+            ],
+          ),
         ),
-        const SizedBox(width: 8),
-        _PreviewDisplayModeButton(
-          shortcutKey: LogicalKeyboardKey.keyE,
-          label: 'Optimized',
-          selected: displayMode == PreviewDisplayMode.optimized,
-          enabled: hasOptimizedPreview,
-          tooltip: optimizedLoading ? 'Optimizing image...' : null,
-          loading: optimizedLoading,
-          onPressed: onSelectOptimized,
-        ),
-        const SizedBox(width: 8),
-        _PreviewDisplayModeButton(
-          shortcutKey: LogicalKeyboardKey.keyD,
-          label: 'Difference',
-          selected: displayMode == PreviewDisplayMode.difference,
-          enabled: supportsDifference,
-          tooltip: differenceUnavailableTooltip,
-          loading: differenceLoading,
-          onPressed: onSelectDifference,
-        ),
-        const Spacer(),
+        const SizedBox(width: 12),
         Tooltip(
           waitDuration: const Duration(milliseconds: 250),
           showDuration: const Duration(milliseconds: 120),
@@ -1884,6 +2111,113 @@ class _PreviewDisplayModeRow extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _HeatmapPaletteSelector extends StatelessWidget {
+  const _HeatmapPaletteSelector({
+    required this.selectedPalette,
+    required this.onSelected,
+  });
+
+  final HeatmapPalette selectedPalette;
+  final ValueChanged<HeatmapPalette> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      key: const ValueKey('heatmap-palette-selector'),
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _HeatmapPaletteButton(
+          label: 'Turbo',
+          selected: selectedPalette == HeatmapPalette.turbo,
+          onPressed: () => onSelected(HeatmapPalette.turbo),
+        ),
+        _HeatmapPaletteButton(
+          label: 'Inferno',
+          selected: selectedPalette == HeatmapPalette.inferno,
+          onPressed: () => onSelected(HeatmapPalette.inferno),
+        ),
+        _HeatmapPaletteButton(
+          label: 'Viridis',
+          selected: selectedPalette == HeatmapPalette.viridis,
+          onPressed: () => onSelected(HeatmapPalette.viridis),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeatmapPaletteButton extends StatelessWidget {
+  const _HeatmapPaletteButton({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: ValueKey('heatmap-palette-$label'),
+      height: 30,
+      child: selected
+          ? PrimaryButton(
+              onPressed: onPressed,
+              child: Text(label).xSmall().medium(),
+            )
+          : OutlineButton(
+              onPressed: onPressed,
+              child: Text(label).xSmall().medium(),
+            ),
+    );
+  }
+}
+
+class _HeatmapVisibilityCheckbox extends StatelessWidget {
+  const _HeatmapVisibilityCheckbox({
+    required this.mode,
+    required this.onChanged,
+  });
+
+  final HeatmapVisibilityMode mode;
+  final ValueChanged<HeatmapVisibilityMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('heatmap-visibility-checkbox'),
+      child: Checkbox(
+        state: switch (mode) {
+          HeatmapVisibilityMode.overlay => CheckboxState.unchecked,
+          HeatmapVisibilityMode.nonzero => CheckboxState.indeterminate,
+          HeatmapVisibilityMode.opaque => CheckboxState.checked,
+        },
+        tristate: true,
+        onChanged: (value) {
+          onChanged(switch (value) {
+            CheckboxState.unchecked => HeatmapVisibilityMode.overlay,
+            CheckboxState.indeterminate => HeatmapVisibilityMode.nonzero,
+            CheckboxState.checked => HeatmapVisibilityMode.opaque,
+          });
+        },
+        trailing: Text(_heatmapVisibilityLabel(mode)).xSmall().medium(),
+      ),
+    );
+  }
+}
+
+String _heatmapVisibilityLabel(HeatmapVisibilityMode mode) {
+  return switch (mode) {
+    HeatmapVisibilityMode.overlay => 'Overlay',
+    HeatmapVisibilityMode.nonzero => 'Nonzero',
+    HeatmapVisibilityMode.opaque => 'Opaque',
+  };
 }
 
 class _PreviewDisplayModeButton extends StatelessWidget {
@@ -3310,7 +3644,8 @@ class _AnalyzePanel extends ConsumerWidget {
                                 mode: displayMode,
                               );
                         }
-                        if (displayMode == PreviewDisplayMode.difference) {
+                        if (displayMode == PreviewDisplayMode.difference ||
+                            displayMode == PreviewDisplayMode.heatmap) {
                           ref
                               .read(previewDifferenceRequestProvider.notifier)
                               .requestForArtifact(sample.artifactId);
@@ -3326,7 +3661,8 @@ class _AnalyzePanel extends ConsumerWidget {
                                 mode: displayMode,
                               );
                         }
-                        if (displayMode == PreviewDisplayMode.difference) {
+                        if (displayMode == PreviewDisplayMode.difference ||
+                            displayMode == PreviewDisplayMode.heatmap) {
                           ref
                               .read(previewDifferenceRequestProvider.notifier)
                               .requestForArtifact(sample.artifactId);
@@ -3339,7 +3675,8 @@ class _AnalyzePanel extends ConsumerWidget {
                       },
                       onExitChart: () {
                         final activeSample = controller.clearHoveredSample();
-                        if (displayMode == PreviewDisplayMode.difference &&
+                        if ((displayMode == PreviewDisplayMode.difference ||
+                                displayMode == PreviewDisplayMode.heatmap) &&
                             activeSample != null) {
                           ref
                               .read(previewDifferenceRequestProvider.notifier)
