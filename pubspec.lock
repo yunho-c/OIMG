@@ -257,6 +257,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.3"
+  dotlottie_flutter:
+    dependency: "direct main"
+    description:
+      name: dotlottie_flutter
+      sha256: "6db4f69659617ac246d7610900488b773a665276b57d8120018aaf6687e40e7e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.4"
   email_validator:
     dependency: transitive
     description:
@@ -523,14 +531,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.29"
-  js:
-    dependency: transitive
-    description:
-      name: js
-      sha256: "53385261521cc4a0c4658fd0ad07a7d14591cf8fc33abbceae306ddb974888dc"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.7.2"
   json_annotation:
     dependency: transitive
     description:
