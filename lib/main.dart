@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:oimg/src/file_open/file_open_channel.dart';
 import 'package:oimg/src/file_open/file_open_controller.dart';
 import 'package:oimg/src/file_open/file_open_providers.dart';
@@ -136,8 +137,12 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final baseTypography = const Typography.geist().scale(_uiScale);
     final settings = ref.watch(appSettingsProvider).asData?.value;
+    final baseTypography = _buildAppTypography(
+      useUrbanist:
+          settings?.developerModeEnabled == true &&
+          settings?.experimentalUrbanistFontEnabled == true,
+    );
 
     return ShadcnApp(
       title: 'OIMG',
@@ -162,6 +167,54 @@ class MyApp extends ConsumerWidget {
       home: const OimgHomePage(),
     );
   }
+}
+
+Typography _buildAppTypography({required bool useUrbanist}) {
+  final typography = useUrbanist
+      ? _urbanistTypography(const Typography.geist())
+      : const Typography.geist();
+  return typography.scale(_uiScale);
+}
+
+Typography _urbanistTypography(Typography base) {
+  TextStyle urbanist(TextStyle style) => GoogleFonts.urbanist(textStyle: style);
+
+  return base.copyWith(
+    sans: () => urbanist(base.sans),
+    xSmall: () => urbanist(base.xSmall),
+    small: () => urbanist(base.small),
+    base: () => urbanist(base.base),
+    large: () => urbanist(base.large),
+    xLarge: () => urbanist(base.xLarge),
+    x2Large: () => urbanist(base.x2Large),
+    x3Large: () => urbanist(base.x3Large),
+    x4Large: () => urbanist(base.x4Large),
+    x5Large: () => urbanist(base.x5Large),
+    x6Large: () => urbanist(base.x6Large),
+    x7Large: () => urbanist(base.x7Large),
+    x8Large: () => urbanist(base.x8Large),
+    x9Large: () => urbanist(base.x9Large),
+    thin: () => urbanist(base.thin),
+    extraLight: () => urbanist(base.extraLight),
+    light: () => urbanist(base.light),
+    normal: () => urbanist(base.normal),
+    medium: () => urbanist(base.medium),
+    semiBold: () => urbanist(base.semiBold),
+    bold: () => urbanist(base.bold),
+    extraBold: () => urbanist(base.extraBold),
+    black: () => urbanist(base.black),
+    italic: () => urbanist(base.italic),
+    h1: () => urbanist(base.h1),
+    h2: () => urbanist(base.h2),
+    h3: () => urbanist(base.h3),
+    h4: () => urbanist(base.h4),
+    p: () => urbanist(base.p),
+    blockQuote: () => urbanist(base.blockQuote),
+    lead: () => urbanist(base.lead),
+    textLarge: () => urbanist(base.textLarge),
+    textSmall: () => urbanist(base.textSmall),
+    textMuted: () => urbanist(base.textMuted),
+  );
 }
 
 class OimgHomePage extends ConsumerStatefulWidget {
@@ -4245,6 +4298,25 @@ class _DeveloperSettingsDialog extends ConsumerWidget {
                       value: settings.homeShaderSpeed,
                       enabled: settings.developerModeEnabled,
                       onChanged: notifier.setHomeShaderSpeed,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _DeveloperSection(
+                    title: 'Typography',
+                    child: Checkbox(
+                      state: settings.experimentalUrbanistFontEnabled
+                          ? CheckboxState.checked
+                          : CheckboxState.unchecked,
+                      onChanged: settings.developerModeEnabled
+                          ? (value) {
+                              notifier.setExperimentalUrbanistFontEnabled(
+                                value == CheckboxState.checked,
+                              );
+                            }
+                          : null,
+                      trailing: Expanded(
+                        child: Text('Urbanist font').small().medium(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),

@@ -62,6 +62,7 @@ void main() {
       await notifier.setThemePreference(AppThemePreference.dark);
       await notifier.setDeveloperModeEnabled(true);
       await notifier.setTimingLogsEnabled(true);
+      await notifier.setExperimentalUrbanistFontEnabled(true);
       await notifier.setMacOsCaptionButtonsEnabled(true);
 
       final settings = container.read(appSettingsProvider).requireValue;
@@ -93,6 +94,7 @@ void main() {
           themePreference: AppThemePreference.dark,
           developerModeEnabled: true,
           timingLogsEnabled: true,
+          experimentalUrbanistFontEnabled: true,
           macOsCaptionButtonsEnabled: true,
         ),
       );

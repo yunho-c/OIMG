@@ -208,6 +208,9 @@ class AppSettingsController extends AsyncNotifier<AppSettings> {
         timingLogsEnabled: developerModeEnabled
             ? settings.timingLogsEnabled
             : false,
+        experimentalUrbanistFontEnabled: developerModeEnabled
+            ? settings.experimentalUrbanistFontEnabled
+            : false,
         macOsCaptionButtonsEnabled: developerModeEnabled
             ? settings.macOsCaptionButtonsEnabled
             : false,
@@ -218,6 +221,16 @@ class AppSettingsController extends AsyncNotifier<AppSettings> {
   Future<void> setTimingLogsEnabled(bool timingLogsEnabled) async {
     await _update(
       (settings) => settings.copyWith(timingLogsEnabled: timingLogsEnabled),
+    );
+  }
+
+  Future<void> setExperimentalUrbanistFontEnabled(
+    bool experimentalUrbanistFontEnabled,
+  ) async {
+    await _update(
+      (settings) => settings.copyWith(
+        experimentalUrbanistFontEnabled: experimentalUrbanistFontEnabled,
+      ),
     );
   }
 

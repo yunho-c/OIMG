@@ -79,6 +79,7 @@ class AppSettings {
     this.themePreference = AppThemePreference.system,
     required this.developerModeEnabled,
     required this.timingLogsEnabled,
+    this.experimentalUrbanistFontEnabled = false,
     this.macOsCaptionButtonsEnabled = false,
     this.differentLocationPath,
     this.previewPathHeaderEnabled = false,
@@ -110,6 +111,7 @@ class AppSettings {
   final AppThemePreference themePreference;
   final bool developerModeEnabled;
   final bool timingLogsEnabled;
+  final bool experimentalUrbanistFontEnabled;
   final bool macOsCaptionButtonsEnabled;
   final bool previewPathHeaderEnabled;
   final double homeShaderSpeed;
@@ -143,6 +145,7 @@ class AppSettings {
     themePreference: AppThemePreference.system,
     developerModeEnabled: false,
     timingLogsEnabled: false,
+    experimentalUrbanistFontEnabled: false,
     macOsCaptionButtonsEnabled: false,
     previewPathHeaderEnabled: false,
     homeShaderSpeed: defaultHomeShaderSpeed,
@@ -217,6 +220,7 @@ class AppSettings {
     AppThemePreference? themePreference,
     bool? developerModeEnabled,
     bool? timingLogsEnabled,
+    bool? experimentalUrbanistFontEnabled,
     bool? macOsCaptionButtonsEnabled,
     bool? previewPathHeaderEnabled,
     double? homeShaderSpeed,
@@ -261,6 +265,9 @@ class AppSettings {
       themePreference: themePreference ?? this.themePreference,
       developerModeEnabled: developerModeEnabled ?? this.developerModeEnabled,
       timingLogsEnabled: timingLogsEnabled ?? this.timingLogsEnabled,
+      experimentalUrbanistFontEnabled:
+          experimentalUrbanistFontEnabled ??
+          this.experimentalUrbanistFontEnabled,
       macOsCaptionButtonsEnabled:
           macOsCaptionButtonsEnabled ?? this.macOsCaptionButtonsEnabled,
       previewPathHeaderEnabled:
@@ -296,6 +303,7 @@ class AppSettings {
       'themePreference': themePreference.name,
       'developerModeEnabled': developerModeEnabled,
       'timingLogsEnabled': timingLogsEnabled,
+      'experimentalUrbanistFontEnabled': experimentalUrbanistFontEnabled,
       'macOsCaptionButtonsEnabled': macOsCaptionButtonsEnabled,
       'previewPathHeaderEnabled': previewPathHeaderEnabled,
       'homeShaderSpeed': homeShaderSpeed,
@@ -383,6 +391,9 @@ class AppSettings {
           defaults.developerModeEnabled,
       timingLogsEnabled:
           json['timingLogsEnabled'] as bool? ?? defaults.timingLogsEnabled,
+      experimentalUrbanistFontEnabled:
+          json['experimentalUrbanistFontEnabled'] as bool? ??
+          defaults.experimentalUrbanistFontEnabled,
       macOsCaptionButtonsEnabled:
           json['macOsCaptionButtonsEnabled'] as bool? ??
           defaults.macOsCaptionButtonsEnabled,
@@ -424,6 +435,8 @@ class AppSettings {
         other.themePreference == themePreference &&
         other.developerModeEnabled == developerModeEnabled &&
         other.timingLogsEnabled == timingLogsEnabled &&
+        other.experimentalUrbanistFontEnabled ==
+            experimentalUrbanistFontEnabled &&
         other.macOsCaptionButtonsEnabled == macOsCaptionButtonsEnabled &&
         other.previewPathHeaderEnabled == previewPathHeaderEnabled &&
         other.homeShaderSpeed == homeShaderSpeed;
@@ -456,6 +469,7 @@ class AppSettings {
     themePreference,
     developerModeEnabled,
     timingLogsEnabled,
+    experimentalUrbanistFontEnabled,
     macOsCaptionButtonsEnabled,
     previewPathHeaderEnabled,
     homeShaderSpeed,
