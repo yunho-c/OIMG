@@ -1058,6 +1058,18 @@ impl SseDecode for bool {
     }
 }
 
+impl SseDecode for crate::types::ColorProfileMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::types::ColorProfileMode::Preserve,
+            1 => crate::types::ColorProfileMode::BakeToSrgb,
+            _ => unreachable!("Invalid variant for ColorProfileMode: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::types::ConvertOptions {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1121,6 +1133,18 @@ impl SseDecode for crate::types::CropSpec {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseDecode for crate::types::EmbeddedMetadata {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_sizeBytes = <u64>::sse_decode(deserializer);
+        return crate::types::EmbeddedMetadata {
+            label: var_label,
+            size_bytes: var_sizeBytes,
+        };
     }
 }
 
@@ -1255,6 +1279,10 @@ impl SseDecode for crate::types::ImageMetadata {
         let mut var_hasTransparency = <bool>::sse_decode(deserializer);
         let mut var_paletteSuitability =
             <Option<crate::types::PaletteSuitability>>::sse_decode(deserializer);
+        let mut var_colorProfile =
+            <Option<crate::types::EmbeddedMetadata>>::sse_decode(deserializer);
+        let mut var_exif = <Option<crate::types::EmbeddedMetadata>>::sse_decode(deserializer);
+        let mut var_metadataSize = <u64>::sse_decode(deserializer);
         return crate::types::ImageMetadata {
             width: var_width,
             height: var_height,
@@ -1262,6 +1290,9 @@ impl SseDecode for crate::types::ImageMetadata {
             file_size: var_fileSize,
             has_transparency: var_hasTransparency,
             palette_suitability: var_paletteSuitability,
+            color_profile: var_colorProfile,
+            exif: var_exif,
+            metadata_size: var_metadataSize,
         };
     }
 }
@@ -1377,6 +1408,17 @@ impl SseDecode for Option<String> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::types::EmbeddedMetadata> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::types::EmbeddedMetadata>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -1571,9 +1613,11 @@ impl SseDecode for crate::types::PreviewFileRequest {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_inputPath = <String>::sse_decode(deserializer);
         let mut var_operation = <crate::types::ImageOperation>::sse_decode(deserializer);
+        let mut var_colorProfileMode = <crate::types::ColorProfileMode>::sse_decode(deserializer);
         return crate::types::PreviewFileRequest {
             input_path: var_inputPath,
             operation: var_operation,
+            color_profile_mode: var_colorProfileMode,
         };
     }
 }
@@ -1603,9 +1647,11 @@ impl SseDecode for crate::types::ProcessBytesRequest {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_data = <Vec<u8>>::sse_decode(deserializer);
         let mut var_operation = <crate::types::ImageOperation>::sse_decode(deserializer);
+        let mut var_colorProfileMode = <crate::types::ColorProfileMode>::sse_decode(deserializer);
         return crate::types::ProcessBytesRequest {
             data: var_data,
             operation: var_operation,
+            color_profile_mode: var_colorProfileMode,
         };
     }
 }
@@ -1630,7 +1676,7 @@ impl SseDecode for crate::types::ProcessFileRequest {
         let mut var_overwrite = <bool>::sse_decode(deserializer);
         let mut var_preserveFileDates = <bool>::sse_decode(deserializer);
         let mut var_preserveExif = <bool>::sse_decode(deserializer);
-        let mut var_preserveColorProfile = <bool>::sse_decode(deserializer);
+        let mut var_colorProfileMode = <crate::types::ColorProfileMode>::sse_decode(deserializer);
         let mut var_operation = <crate::types::ImageOperation>::sse_decode(deserializer);
         return crate::types::ProcessFileRequest {
             input_path: var_inputPath,
@@ -1638,7 +1684,7 @@ impl SseDecode for crate::types::ProcessFileRequest {
             overwrite: var_overwrite,
             preserve_file_dates: var_preserveFileDates,
             preserve_exif: var_preserveExif,
-            preserve_color_profile: var_preserveColorProfile,
+            color_profile_mode: var_colorProfileMode,
             operation: var_operation,
         };
     }
@@ -2168,6 +2214,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::types::BatchProcessRequest>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::types::ColorProfileMode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Preserve => 0.into_dart(),
+            Self::BakeToSrgb => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::types::ColorProfileMode
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::types::ColorProfileMode>
+    for crate::types::ColorProfileMode
+{
+    fn into_into_dart(self) -> crate::types::ColorProfileMode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::types::ConvertOptions {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2238,6 +2305,27 @@ impl flutter_rust_bridge::IntoDart for crate::types::CropSpec {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::types::CropSpec {}
 impl flutter_rust_bridge::IntoIntoDart<crate::types::CropSpec> for crate::types::CropSpec {
     fn into_into_dart(self) -> crate::types::CropSpec {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::types::EmbeddedMetadata {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.label.into_into_dart().into_dart(),
+            self.size_bytes.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::types::EmbeddedMetadata
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::types::EmbeddedMetadata>
+    for crate::types::EmbeddedMetadata
+{
+    fn into_into_dart(self) -> crate::types::EmbeddedMetadata {
         self
     }
 }
@@ -2367,6 +2455,9 @@ impl flutter_rust_bridge::IntoDart for crate::types::ImageMetadata {
             self.file_size.into_into_dart().into_dart(),
             self.has_transparency.into_into_dart().into_dart(),
             self.palette_suitability.into_into_dart().into_dart(),
+            self.color_profile.into_into_dart().into_dart(),
+            self.exif.into_into_dart().into_dart(),
+            self.metadata_size.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2522,6 +2613,7 @@ impl flutter_rust_bridge::IntoDart for crate::types::PreviewFileRequest {
         [
             self.input_path.into_into_dart().into_dart(),
             self.operation.into_into_dart().into_dart(),
+            self.color_profile_mode.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2565,6 +2657,7 @@ impl flutter_rust_bridge::IntoDart for crate::types::ProcessBytesRequest {
         [
             self.data.into_into_dart().into_dart(),
             self.operation.into_into_dart().into_dart(),
+            self.color_profile_mode.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2610,7 +2703,7 @@ impl flutter_rust_bridge::IntoDart for crate::types::ProcessFileRequest {
             self.overwrite.into_into_dart().into_dart(),
             self.preserve_file_dates.into_into_dart().into_dart(),
             self.preserve_exif.into_into_dart().into_dart(),
-            self.preserve_color_profile.into_into_dart().into_dart(),
+            self.color_profile_mode.into_into_dart().into_dart(),
             self.operation.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -2938,6 +3031,22 @@ impl SseEncode for bool {
     }
 }
 
+impl SseEncode for crate::types::ColorProfileMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::types::ColorProfileMode::Preserve => 0,
+                crate::types::ColorProfileMode::BakeToSrgb => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
 impl SseEncode for crate::types::ConvertOptions {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2984,6 +3093,14 @@ impl SseEncode for crate::types::CropSpec {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseEncode for crate::types::EmbeddedMetadata {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.label, serializer);
+        <u64>::sse_encode(self.size_bytes, serializer);
     }
 }
 
@@ -3087,6 +3204,9 @@ impl SseEncode for crate::types::ImageMetadata {
             self.palette_suitability,
             serializer,
         );
+        <Option<crate::types::EmbeddedMetadata>>::sse_encode(self.color_profile, serializer);
+        <Option<crate::types::EmbeddedMetadata>>::sse_encode(self.exif, serializer);
+        <u64>::sse_encode(self.metadata_size, serializer);
     }
 }
 
@@ -3187,6 +3307,16 @@ impl SseEncode for Option<String> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::types::EmbeddedMetadata> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::types::EmbeddedMetadata>::sse_encode(value, serializer);
         }
     }
 }
@@ -3358,6 +3488,7 @@ impl SseEncode for crate::types::PreviewFileRequest {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.input_path, serializer);
         <crate::types::ImageOperation>::sse_encode(self.operation, serializer);
+        <crate::types::ColorProfileMode>::sse_encode(self.color_profile_mode, serializer);
     }
 }
 
@@ -3378,6 +3509,7 @@ impl SseEncode for crate::types::ProcessBytesRequest {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <Vec<u8>>::sse_encode(self.data, serializer);
         <crate::types::ImageOperation>::sse_encode(self.operation, serializer);
+        <crate::types::ColorProfileMode>::sse_encode(self.color_profile_mode, serializer);
     }
 }
 
@@ -3397,7 +3529,7 @@ impl SseEncode for crate::types::ProcessFileRequest {
         <bool>::sse_encode(self.overwrite, serializer);
         <bool>::sse_encode(self.preserve_file_dates, serializer);
         <bool>::sse_encode(self.preserve_exif, serializer);
-        <bool>::sse_encode(self.preserve_color_profile, serializer);
+        <crate::types::ColorProfileMode>::sse_encode(self.color_profile_mode, serializer);
         <crate::types::ImageOperation>::sse_encode(self.operation, serializer);
     }
 }

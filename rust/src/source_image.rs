@@ -1,6 +1,7 @@
 use slimg_core::{decode, Format, ImageData};
 
 use crate::error::{Result, SlimgBridgeError};
+use crate::types::ColorProfileMode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SourceFormat {
@@ -37,6 +38,13 @@ pub(crate) struct SourceImage {
 }
 
 pub(crate) fn decode_source_image(data: &[u8]) -> Result<SourceImage> {
+    decode_source_image_with_color(data, ColorProfileMode::Preserve)
+}
+
+pub(crate) fn decode_source_image_with_color(
+    data: &[u8],
+    mode: ColorProfileMode,
+) -> Result<SourceImage> {
     if is_heic(data) {
         return decode_heic(data).map(|image| SourceImage {
             image,
@@ -44,7 +52,16 @@ pub(crate) fn decode_source_image(data: &[u8]) -> Result<SourceImage> {
         });
     }
 
-    let (image, format) = decode(data)?;
+    let (mut image, format) = decode(data)?;
+    let source_icc = crate::metadata::inspect(data).icc;
+    if let Some(icc) = source_icc.as_deref() {
+        crate::metadata::validate_icc(icc)?;
+    }
+    if mode == ColorProfileMode::BakeToSrgb {
+        if let Some(icc) = source_icc {
+            image.data = crate::metadata::convert_rgba_to_srgb(&image.data, &icc)?;
+        }
+    }
     Ok(SourceImage {
         image,
         format: SourceFormat::Core(format),

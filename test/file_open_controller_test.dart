@@ -451,6 +451,7 @@ ImageMetadata _metadata(String format) {
     format: format,
     fileSize: BigInt.from(1024),
     hasTransparency: false,
+    metadataSize: BigInt.zero,
   );
 }
 

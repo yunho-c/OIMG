@@ -46,12 +46,15 @@ OptimizationPlan buildOptimizationPlan({
   final pngPaletteMode = targetCodec == PreferredCodec.png
       ? _pngPaletteModeOf(settings.pngPaletteMode)
       : null;
-  final useSourceImageForPreview = switch (targetCodec) {
-    PreferredCodec.png => settings.pngPaletteMode == PngPalettePreference.off,
-    PreferredCodec.webp => effectiveQuality == 100,
-    PreferredCodec.jxl => effectiveQuality == 100,
-    _ => false,
-  };
+  final useSourceImageForPreview =
+      settings.preserveColorProfile &&
+      switch (targetCodec) {
+        PreferredCodec.png =>
+          settings.pngPaletteMode == PngPalettePreference.off,
+        PreferredCodec.webp => effectiveQuality == 100,
+        PreferredCodec.jxl => effectiveQuality == 100,
+        _ => false,
+      };
   final operation = usesSourceCodec
       ? ImageOperation.optimize(
           OptimizeOptions(
@@ -87,12 +90,17 @@ OptimizationPlan buildOptimizationPlan({
       overwrite: storageDecision.overwrite,
       preserveFileDates: settings.preserveOriginalDate,
       preserveExif: settings.preserveExif,
-      preserveColorProfile: settings.preserveColorProfile,
+      colorProfileMode: settings.preserveColorProfile
+          ? ColorProfileMode.preserve
+          : ColorProfileMode.bakeToSrgb,
       operation: operation,
     ),
     previewRequest: PreviewFileRequest(
       inputPath: file.path,
       operation: operation,
+      colorProfileMode: settings.preserveColorProfile
+          ? ColorProfileMode.preserve
+          : ColorProfileMode.bakeToSrgb,
     ),
     keepSourceEntry: storageDecision.keepSourceEntry,
     deleteSourceAfterSuccess: storageDecision.deleteSourceAfterSuccess,

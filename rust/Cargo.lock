@@ -1483,6 +1483,7 @@ dependencies = [
  "flutter_rust_bridge",
  "image",
  "img-parts",
+ "moxcms",
  "serde",
  "serde_json",
  "slimg-core",

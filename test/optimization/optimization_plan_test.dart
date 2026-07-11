@@ -17,6 +17,7 @@ void main() {
             format: 'jpeg',
             fileSize: BigInt.from(2000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: AppSettings.defaults,
@@ -26,6 +27,8 @@ void main() {
       expect(plan.useSourceImageForPreview, isFalse);
       expect(plan.processRequest.outputPath, isNull);
       expect(plan.processRequest.preserveFileDates, isFalse);
+      expect(plan.processRequest.colorProfileMode, ColorProfileMode.preserve);
+      expect(plan.previewRequest.colorProfileMode, ColorProfileMode.preserve);
       plan.processRequest.operation.when(
         convert: (_) => fail('expected optimize'),
         optimize: (options) {
@@ -49,6 +52,7 @@ void main() {
             format: 'png',
             fileSize: BigInt.from(3000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: AppSettings.defaults,
@@ -81,6 +85,7 @@ void main() {
             format: 'jpeg',
             fileSize: BigInt.from(2000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: const AppSettings(
@@ -110,6 +115,7 @@ void main() {
             format: 'jpeg',
             fileSize: BigInt.from(2000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: const AppSettings(
@@ -123,7 +129,7 @@ void main() {
           preserveFolderStructure: true,
           preserveOriginalDate: false,
           preserveExif: false,
-          preserveColorProfile: false,
+          preserveColorProfile: true,
           developerModeEnabled: false,
           timingLogsEnabled: false,
         ),
@@ -154,6 +160,7 @@ void main() {
               format: 'jpeg',
               fileSize: BigInt.from(2000),
               hasTransparency: false,
+              metadataSize: BigInt.zero,
             ),
           ),
           settings: const AppSettings(
@@ -195,6 +202,7 @@ void main() {
             format: 'png',
             fileSize: BigInt.from(3000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: const AppSettings(
@@ -235,6 +243,7 @@ void main() {
             format: 'png',
             fileSize: BigInt.from(3000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: const AppSettings(
@@ -276,6 +285,7 @@ void main() {
             format: 'jpeg',
             fileSize: BigInt.from(2000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: const AppSettings(
@@ -320,6 +330,7 @@ void main() {
             format: 'png',
             fileSize: BigInt.from(3000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: const AppSettings(
@@ -357,6 +368,7 @@ void main() {
               format: 'png',
               fileSize: BigInt.from(3000),
               hasTransparency: false,
+              metadataSize: BigInt.zero,
             ),
           ),
           settings: const AppSettings(
@@ -398,6 +410,7 @@ void main() {
             format: 'png',
             fileSize: BigInt.from(3000),
             hasTransparency: false,
+            metadataSize: BigInt.zero,
           ),
         ),
         settings: const AppSettings(
@@ -419,5 +432,26 @@ void main() {
 
       expect(plan.processRequest.preserveFileDates, isTrue);
     });
+  });
+
+  test('bake color policy is shared by preview and final output', () {
+    final plan = buildOptimizationPlan(
+      file: OpenedImageFile(
+        path: '/tmp/photo.jpg',
+        metadata: ImageMetadata(
+          width: 48,
+          height: 32,
+          format: 'jpeg',
+          fileSize: BigInt.from(2000),
+          hasTransparency: false,
+          metadataSize: BigInt.zero,
+        ),
+      ),
+      settings: AppSettings.defaults.copyWith(preserveColorProfile: false),
+    );
+
+    expect(plan.processRequest.colorProfileMode, ColorProfileMode.bakeToSrgb);
+    expect(plan.previewRequest.colorProfileMode, ColorProfileMode.bakeToSrgb);
+    expect(plan.useSourceImageForPreview, isFalse);
   });
 }

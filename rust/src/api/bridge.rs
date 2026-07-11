@@ -4,10 +4,11 @@ pub use crate::error::SlimgBridgeError;
 pub use crate::types::{
     AnalyzeFileJobHandle, AnalyzeFileJobSnapshot, AnalyzeFileRequest, AnalyzeSampleResult,
     BatchItemResult, BatchJobHandle, BatchJobSnapshot, BatchJobState, BatchProcessRequest,
-    ConvertOptions, CropOptions, CropSpec, EncodedImageResult, ExtendOptions, ExtendSpec, FillSpec,
-    FormatInfo, ImageMetadata, ImageOperation, OptimizeOptions, PreviewArtifactRequest,
-    PreviewFileRequest, PreviewResult, ProcessBytesRequest, ProcessFileBatchRequest,
-    ProcessFileRequest, ProcessResult, RawImageResult, ResizeOptions, ResizeSpec,
+    ColorProfileMode, ConvertOptions, CropOptions, CropSpec, EmbeddedMetadata, EncodedImageResult,
+    ExtendOptions, ExtendSpec, FillSpec, FormatInfo, ImageMetadata, ImageOperation,
+    OptimizeOptions, PreviewArtifactRequest, PreviewFileRequest, PreviewResult,
+    ProcessBytesRequest, ProcessFileBatchRequest, ProcessFileRequest, ProcessResult,
+    RawImageResult, ResizeOptions, ResizeSpec,
 };
 
 use crate::error::{panic_message, Result};

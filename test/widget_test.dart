@@ -1060,6 +1060,7 @@ void main() {
           format: 'png',
           fileSize: BigInt.from(2400),
           hasTransparency: false,
+          metadataSize: BigInt.zero,
         ),
         '/tmp/huge-b.png': ImageMetadata(
           width: 4096,
@@ -1067,6 +1068,7 @@ void main() {
           format: 'png',
           fileSize: BigInt.from(2200),
           hasTransparency: false,
+          metadataSize: BigInt.zero,
         ),
       },
     );
@@ -3553,7 +3555,7 @@ void main() {
     expect(store.value, contains('"timingLogsEnabled":true'));
     expect(store.value, contains('"macOsCaptionButtonsEnabled":true'));
     expect(store.value, contains('"homeShaderSpeed":0.25'));
-    expect(store.value, contains('"homeAcrylicPanelEnabled":true'));
+    expect(store.value, contains('"homeAcrylicPanelEnabled":false'));
     expect(store.value, contains('"bottomStatAnimationMode":"flipper"'));
   });
 
@@ -4013,7 +4015,7 @@ void main() {
           preserveFolderStructure: true,
           preserveOriginalDate: false,
           preserveExif: false,
-          preserveColorProfile: false,
+          preserveColorProfile: true,
           developerModeEnabled: false,
           timingLogsEnabled: false,
         ).toJsonString();
@@ -4453,8 +4455,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('metadata-collapsible-toggle')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Preserve color profile'), findsOneWidget);
-    expect(find.text('Preserve camera info (EXIF)'), findsOneWidget);
+    expect(find.text('Preserve color'), findsOneWidget);
+    expect(find.text('Preserve camera info'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const ValueKey('metadata-preserve-color-profile')),
@@ -4464,8 +4466,41 @@ void main() {
     await tester.pumpAndSettle();
 
     final settings = AppSettings.fromJsonString((await store.read())!);
-    expect(settings.preserveColorProfile, isTrue);
+    expect(settings.preserveColorProfile, isFalse);
     expect(settings.preserveExif, isTrue);
+  });
+
+  testWidgets('metadata section shows exact embedded byte totals', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final slimg = _FakeSlimgApi(
+      inspectResults: {
+        '/tmp/source.png': _metadata(
+          'png',
+          2400,
+          colorProfileBytes: 3072,
+          exifBytes: 640,
+        ),
+      },
+    );
+    final controller = FileOpenController(
+      channel: _FakeFileOpenChannel(),
+      slimg: slimg,
+      initialPaths: const ['/tmp/source.png'],
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(_buildApp(controller: controller, slimg: slimg));
+    await tester.pumpAndSettle();
+    expect(find.text('3.6 KB'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('metadata-collapsible-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Preserve color  ·  3.0 KB'), findsOneWidget);
+    expect(find.text('Preserve camera info  ·  640 B'), findsOneWidget);
   });
 
   testWidgets('quality section toggles metric colors from the settings menu', (
@@ -4761,6 +4796,8 @@ ImageMetadata _metadata(
   String format,
   int? bytes, {
   bool hasTransparency = false,
+  int? colorProfileBytes,
+  int? exifBytes,
 }) {
   return ImageMetadata(
     width: 48,
@@ -4768,6 +4805,19 @@ ImageMetadata _metadata(
     format: format,
     fileSize: bytes == null ? null : BigInt.from(bytes),
     hasTransparency: hasTransparency,
+    colorProfile: colorProfileBytes == null
+        ? null
+        : EmbeddedMetadata(
+            label: 'Color profile',
+            sizeBytes: BigInt.from(colorProfileBytes),
+          ),
+    exif: exifBytes == null
+        ? null
+        : EmbeddedMetadata(
+            label: 'Camera info',
+            sizeBytes: BigInt.from(exifBytes),
+          ),
+    metadataSize: BigInt.from((colorProfileBytes ?? 0) + (exifBytes ?? 0)),
   );
 }
 

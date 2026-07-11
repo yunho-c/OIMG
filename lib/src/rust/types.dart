@@ -276,6 +276,8 @@ class BatchProcessRequest {
           continueOnError == other.continueOnError;
 }
 
+enum ColorProfileMode { preserve, bakeToSrgb }
+
 class ConvertOptions {
   final String targetFormat;
   final int quality;
@@ -356,6 +358,24 @@ sealed class CropSpec with _$CropSpec {
     required int width,
     required int height,
   }) = CropSpec_AspectRatio;
+}
+
+class EmbeddedMetadata {
+  final String label;
+  final BigInt sizeBytes;
+
+  const EmbeddedMetadata({required this.label, required this.sizeBytes});
+
+  @override
+  int get hashCode => label.hashCode ^ sizeBytes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EmbeddedMetadata &&
+          runtimeType == other.runtimeType &&
+          label == other.label &&
+          sizeBytes == other.sizeBytes;
 }
 
 class EncodedImageResult {
@@ -488,6 +508,9 @@ class ImageMetadata {
   final BigInt? fileSize;
   final bool hasTransparency;
   final PaletteSuitability? paletteSuitability;
+  final EmbeddedMetadata? colorProfile;
+  final EmbeddedMetadata? exif;
+  final BigInt metadataSize;
 
   const ImageMetadata({
     required this.width,
@@ -496,6 +519,9 @@ class ImageMetadata {
     this.fileSize,
     required this.hasTransparency,
     this.paletteSuitability,
+    this.colorProfile,
+    this.exif,
+    required this.metadataSize,
   });
 
   @override
@@ -505,7 +531,10 @@ class ImageMetadata {
       format.hashCode ^
       fileSize.hashCode ^
       hasTransparency.hashCode ^
-      paletteSuitability.hashCode;
+      paletteSuitability.hashCode ^
+      colorProfile.hashCode ^
+      exif.hashCode ^
+      metadataSize.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -517,7 +546,10 @@ class ImageMetadata {
           format == other.format &&
           fileSize == other.fileSize &&
           hasTransparency == other.hasTransparency &&
-          paletteSuitability == other.paletteSuitability;
+          paletteSuitability == other.paletteSuitability &&
+          colorProfile == other.colorProfile &&
+          exif == other.exif &&
+          metadataSize == other.metadataSize;
 }
 
 @freezed
@@ -624,11 +656,17 @@ class PreviewArtifactRequest {
 class PreviewFileRequest {
   final String inputPath;
   final ImageOperation operation;
+  final ColorProfileMode colorProfileMode;
 
-  const PreviewFileRequest({required this.inputPath, required this.operation});
+  const PreviewFileRequest({
+    required this.inputPath,
+    required this.operation,
+    required this.colorProfileMode,
+  });
 
   @override
-  int get hashCode => inputPath.hashCode ^ operation.hashCode;
+  int get hashCode =>
+      inputPath.hashCode ^ operation.hashCode ^ colorProfileMode.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -636,7 +674,8 @@ class PreviewFileRequest {
       other is PreviewFileRequest &&
           runtimeType == other.runtimeType &&
           inputPath == other.inputPath &&
-          operation == other.operation;
+          operation == other.operation &&
+          colorProfileMode == other.colorProfileMode;
 }
 
 class PreviewResult {
@@ -681,11 +720,17 @@ class PreviewResult {
 class ProcessBytesRequest {
   final Uint8List data;
   final ImageOperation operation;
+  final ColorProfileMode colorProfileMode;
 
-  const ProcessBytesRequest({required this.data, required this.operation});
+  const ProcessBytesRequest({
+    required this.data,
+    required this.operation,
+    required this.colorProfileMode,
+  });
 
   @override
-  int get hashCode => data.hashCode ^ operation.hashCode;
+  int get hashCode =>
+      data.hashCode ^ operation.hashCode ^ colorProfileMode.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -693,7 +738,8 @@ class ProcessBytesRequest {
       other is ProcessBytesRequest &&
           runtimeType == other.runtimeType &&
           data == other.data &&
-          operation == other.operation;
+          operation == other.operation &&
+          colorProfileMode == other.colorProfileMode;
 }
 
 class ProcessFileBatchRequest {
@@ -723,7 +769,7 @@ class ProcessFileRequest {
   final bool overwrite;
   final bool preserveFileDates;
   final bool preserveExif;
-  final bool preserveColorProfile;
+  final ColorProfileMode colorProfileMode;
   final ImageOperation operation;
 
   const ProcessFileRequest({
@@ -732,7 +778,7 @@ class ProcessFileRequest {
     required this.overwrite,
     required this.preserveFileDates,
     required this.preserveExif,
-    required this.preserveColorProfile,
+    required this.colorProfileMode,
     required this.operation,
   });
 
@@ -743,7 +789,7 @@ class ProcessFileRequest {
       overwrite.hashCode ^
       preserveFileDates.hashCode ^
       preserveExif.hashCode ^
-      preserveColorProfile.hashCode ^
+      colorProfileMode.hashCode ^
       operation.hashCode;
 
   @override
@@ -756,7 +802,7 @@ class ProcessFileRequest {
           overwrite == other.overwrite &&
           preserveFileDates == other.preserveFileDates &&
           preserveExif == other.preserveExif &&
-          preserveColorProfile == other.preserveColorProfile &&
+          colorProfileMode == other.colorProfileMode &&
           operation == other.operation;
 }
 

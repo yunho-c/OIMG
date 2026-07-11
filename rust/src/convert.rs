@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
-use img_parts::{DynImage, ImageEXIF, ImageICC};
 use slimg_core::{
     analyze_palette_suitability,
     codec::{get_codec, EncodeOptions},
@@ -16,11 +15,12 @@ use crate::codec::format_to_string;
 use crate::error::{Result, SlimgBridgeError};
 use crate::fs::{derive_output_path, safe_write_bytes, to_path_buf};
 use crate::preview_artifacts::{preview_artifact_store, PreviewArtifact};
-use crate::source_image::{decode_source_image, SourceFormat};
+use crate::source_image::{decode_source_image, decode_source_image_with_color, SourceFormat};
 use crate::types::{
-    BatchItemResult, BatchProcessRequest, ConvertOptions, CropSpec, EncodedImageResult, ExtendSpec,
-    FillSpec, ImageMetadata, ImageOperation, OptimizeOptions, PreviewResult, ProcessBytesRequest,
-    ProcessFileBatchRequest, ProcessFileRequest, ProcessResult, ResizeSpec,
+    BatchItemResult, BatchProcessRequest, ColorProfileMode, ConvertOptions, CropSpec,
+    EncodedImageResult, ExtendSpec, FillSpec, ImageMetadata, ImageOperation, OptimizeOptions,
+    PreviewResult, ProcessBytesRequest, ProcessFileBatchRequest, ProcessFileRequest, ProcessResult,
+    ResizeSpec,
 };
 
 pub(crate) fn inspect_file(input_path: String) -> Result<ImageMetadata> {
@@ -37,6 +37,7 @@ pub(crate) fn inspect_bytes(data: Vec<u8>) -> Result<ImageMetadata> {
     }
 
     let source = decode_source_image(&data)?;
+    let embedded = crate::metadata::inspect(&data);
     let image = source.image;
     Ok(ImageMetadata {
         width: image.width,
@@ -45,6 +46,17 @@ pub(crate) fn inspect_bytes(data: Vec<u8>) -> Result<ImageMetadata> {
         file_size: None,
         has_transparency: image.data.chunks_exact(4).any(|pixel| pixel[3] < 255),
         palette_suitability: Some(analyze_palette_suitability(&image).into()),
+        color_profile: crate::metadata::embedded_summary(
+            "Color profile",
+            embedded.icc.as_deref(),
+            embedded.icc_size,
+        ),
+        exif: crate::metadata::embedded_summary(
+            "Camera info",
+            embedded.exif.as_deref(),
+            embedded.exif_size,
+        ),
+        metadata_size: embedded.icc_size + embedded.exif_size,
     })
 }
 
@@ -53,7 +65,17 @@ pub(crate) fn process_bytes(request: ProcessBytesRequest) -> Result<EncodedImage
         return Err(SlimgBridgeError::invalid_request("data must not be empty"));
     }
 
-    let output = run_operation(&request.data, &request.operation, None)?;
+    let source_metadata = crate::metadata::inspect(&request.data);
+    let source_format = detect_source_format(&request.data)?;
+    let target_format = resolve_output_format(&request.operation, source_format)?;
+    let mode = effective_color_mode(request.color_profile_mode, target_format);
+    let mut output = run_operation(&request.data, &request.operation, None, mode)?;
+    output.data = apply_color_metadata(
+        output.data,
+        target_format,
+        mode,
+        source_metadata.icc.as_deref(),
+    )?;
     Ok(EncodedImageResult {
         encoded_bytes: output.data.clone(),
         format: format_to_string(output.format),
@@ -77,7 +99,11 @@ pub(crate) fn preview_file(request: crate::types::PreviewFileRequest) -> Result<
         let read_elapsed = read_start.elapsed();
 
         let operation_start = Instant::now();
-        let source = decode_source_image(&data)?;
+        let source_metadata = crate::metadata::inspect(&data);
+        let source_format = detect_source_format(&data)?;
+        let target_format = resolve_output_format(&request.operation, source_format)?;
+        let mode = effective_color_mode(request.color_profile_mode, target_format);
+        let source = decode_source_image_with_color(&data, mode)?;
         let output = run_preview_operation(&source.image, source.format, &request.operation, None)?;
         let operation_elapsed = operation_start.elapsed();
         crate::diagnostics::timing_log(format!(
@@ -88,8 +114,15 @@ pub(crate) fn preview_file(request: crate::types::PreviewFileRequest) -> Result<
             data.len()
         ));
 
+        let encoded_bytes = apply_color_metadata(
+            output.data,
+            target_format,
+            mode,
+            source_metadata.icc.as_deref(),
+        )?;
+        let size_bytes = encoded_bytes.len() as u64;
         Ok(PreviewResult {
-            encoded_bytes: output.data.clone(),
+            encoded_bytes,
             artifact_id: preview_artifact_store().insert(PreviewArtifact::new(
                 source.image.width,
                 source.image.height,
@@ -101,7 +134,7 @@ pub(crate) fn preview_file(request: crate::types::PreviewFileRequest) -> Result<
             format: format_to_string(output.format),
             width: output.width,
             height: output.height,
-            size_bytes: output.data.len() as u64,
+            size_bytes,
         })
     })();
 
@@ -171,7 +204,7 @@ pub(crate) fn process_file_request_with_threads(
         request.overwrite,
         request.preserve_file_dates,
         request.preserve_exif,
-        request.preserve_color_profile,
+        request.color_profile_mode,
         request.operation,
         threads,
     )
@@ -192,7 +225,7 @@ pub(crate) fn process_file_path_with_threads(
         overwrite,
         false,
         false,
-        false,
+        ColorProfileMode::Preserve,
         operation,
         threads,
     )
@@ -205,7 +238,7 @@ fn process_file_path_with_metadata(
     overwrite: bool,
     preserve_file_dates: bool,
     preserve_exif: bool,
-    preserve_color_profile: bool,
+    color_profile_mode: ColorProfileMode,
     operation: ImageOperation,
     threads: Option<usize>,
 ) -> Result<ProcessResult> {
@@ -214,6 +247,8 @@ fn process_file_path_with_metadata(
     let input_bytes = fs::read(&input).map_err(|error| map_input_io(&input, error))?;
     let source_format = detect_source_format(&input_bytes)?;
     let target_format = resolve_output_format(&operation, source_format)?;
+    let color_profile_mode = effective_color_mode(color_profile_mode, target_format);
+    let source_metadata = crate::metadata::inspect(&input_bytes);
     let explicit_output = explicit_output_path
         .as_deref()
         .map(|value| to_path_buf(value, "output_path"))
@@ -228,19 +263,43 @@ fn process_file_path_with_metadata(
         target_format,
     )?;
 
-    let mut output = run_operation(&input_bytes, &operation, threads)?;
+    let mut output = run_operation(&input_bytes, &operation, threads, color_profile_mode)?;
     let preserved_dates = if preserve_file_dates && output.should_write {
         crate::fs::PreservedFileDates::capture(&input)
     } else {
         None
     };
     if output.should_write {
-        output.data = preserve_metadata(
-            &input_bytes,
-            output.data,
-            preserve_exif,
-            preserve_color_profile,
-        )?;
+        let exif = preserve_exif
+            .then_some(source_metadata.exif.as_deref())
+            .flatten();
+        let baked_srgb = if color_profile_mode == ColorProfileMode::BakeToSrgb
+            && supports_embedded_metadata(target_format)
+        {
+            Some(crate::metadata::srgb_profile_bytes()?)
+        } else {
+            None
+        };
+        let icc = match color_profile_mode {
+            ColorProfileMode::Preserve => source_metadata.icc.as_deref(),
+            ColorProfileMode::BakeToSrgb => baked_srgb.as_deref(),
+        };
+        output.data = if supports_embedded_metadata(target_format) {
+            crate::metadata::write_metadata(output.data, exif, icc)?
+        } else {
+            output.data
+        };
+        if matches!(
+            &operation,
+            ImageOperation::Optimize(OptimizeOptions {
+                write_only_if_smaller: true,
+                ..
+            })
+        ) && output.data.len() >= input_bytes.len()
+        {
+            output.data = input_bytes.clone();
+            output.should_write = false;
+        }
     }
     crate::diagnostics::timing_log(format!(
         "process resolved input={} output={} source_format={} target_format={} should_write={} overwrite={}",
@@ -296,95 +355,106 @@ fn process_file_path_with_metadata(
     Ok(result)
 }
 
-fn preserve_metadata(
-    input_bytes: &[u8],
-    output_bytes: Vec<u8>,
-    preserve_exif: bool,
-    preserve_color_profile: bool,
-) -> Result<Vec<u8>> {
-    if !preserve_exif && !preserve_color_profile {
-        return Ok(output_bytes);
-    }
-
-    let Ok(Some(source_image)) = DynImage::from_bytes(input_bytes.to_vec().into()) else {
-        return Ok(output_bytes);
-    };
-
-    let Some(mut output_image) =
-        DynImage::from_bytes(output_bytes.clone().into()).map_err(|error| {
-            SlimgBridgeError::Internal {
-                message: format!("metadata output parse failed: {error}"),
-            }
-        })?
-    else {
-        return Ok(output_bytes);
-    };
-
-    if preserve_exif {
-        output_image.set_exif(source_image.exif());
-    }
-    if preserve_color_profile {
-        output_image.set_icc_profile(source_image.icc_profile());
-    }
-
-    let mut encoded = Vec::new();
-    output_image
-        .encoder()
-        .write_to(&mut encoded)
-        .map_err(|error| SlimgBridgeError::Internal {
-            message: format!("metadata encode failed: {error}"),
-        })?;
-    Ok(encoded)
-}
-
 fn run_operation(
     data: &[u8],
     operation: &ImageOperation,
     threads: Option<usize>,
+    color_profile_mode: ColorProfileMode,
 ) -> Result<OperationOutput> {
     match operation {
-        ImageOperation::Convert(options) => convert_bytes(data, options, threads),
-        ImageOperation::Optimize(options) => optimize_bytes(data, options, threads),
-        ImageOperation::Resize(options) => transform_bytes(data, options.quality, |source| {
-            Ok(PipelineOptions {
-                format: resolve_optional_target_format(options.target_format.as_deref(), source)?,
-                quality: validate_quality(options.quality)?,
-                effort: validate_effort(options.effort)?,
-                png_palette: map_png_palette(options.png_palette),
-                threads,
-                resize: Some(map_resize_spec(&options.resize)?),
-                crop: None,
-                extend: None,
-                fill_color: None,
+        ImageOperation::Convert(options) => {
+            convert_bytes(data, options, threads, color_profile_mode)
+        }
+        ImageOperation::Optimize(options) => {
+            optimize_bytes(data, options, threads, color_profile_mode)
+        }
+        ImageOperation::Resize(options) => {
+            transform_bytes(data, options.quality, color_profile_mode, |source| {
+                Ok(PipelineOptions {
+                    format: resolve_optional_target_format(
+                        options.target_format.as_deref(),
+                        source,
+                    )?,
+                    quality: validate_quality(options.quality)?,
+                    effort: validate_effort(options.effort)?,
+                    png_palette: map_png_palette(options.png_palette),
+                    threads,
+                    resize: Some(map_resize_spec(&options.resize)?),
+                    crop: None,
+                    extend: None,
+                    fill_color: None,
+                })
             })
-        }),
-        ImageOperation::Crop(options) => transform_bytes(data, options.quality, |source| {
-            Ok(PipelineOptions {
-                format: resolve_optional_target_format(options.target_format.as_deref(), source)?,
-                quality: validate_quality(options.quality)?,
-                effort: validate_effort(options.effort)?,
-                png_palette: map_png_palette(options.png_palette),
-                threads,
-                resize: None,
-                crop: Some(map_crop_spec(&options.crop)?),
-                extend: None,
-                fill_color: None,
+        }
+        ImageOperation::Crop(options) => {
+            transform_bytes(data, options.quality, color_profile_mode, |source| {
+                Ok(PipelineOptions {
+                    format: resolve_optional_target_format(
+                        options.target_format.as_deref(),
+                        source,
+                    )?,
+                    quality: validate_quality(options.quality)?,
+                    effort: validate_effort(options.effort)?,
+                    png_palette: map_png_palette(options.png_palette),
+                    threads,
+                    resize: None,
+                    crop: Some(map_crop_spec(&options.crop)?),
+                    extend: None,
+                    fill_color: None,
+                })
             })
-        }),
-        ImageOperation::Extend(options) => transform_bytes(data, options.quality, |source| {
-            Ok(PipelineOptions {
-                format: resolve_optional_target_format(options.target_format.as_deref(), source)?,
-                quality: validate_quality(options.quality)?,
-                effort: validate_effort(options.effort)?,
-                png_palette: map_png_palette(options.png_palette),
-                threads,
-                resize: None,
-                crop: None,
-                extend: Some(map_extend_spec(&options.extend)?),
-                fill_color: map_fill_spec(options.fill.as_ref()),
+        }
+        ImageOperation::Extend(options) => {
+            transform_bytes(data, options.quality, color_profile_mode, |source| {
+                Ok(PipelineOptions {
+                    format: resolve_optional_target_format(
+                        options.target_format.as_deref(),
+                        source,
+                    )?,
+                    quality: validate_quality(options.quality)?,
+                    effort: validate_effort(options.effort)?,
+                    png_palette: map_png_palette(options.png_palette),
+                    threads,
+                    resize: None,
+                    crop: None,
+                    extend: Some(map_extend_spec(&options.extend)?),
+                    fill_color: map_fill_spec(options.fill.as_ref()),
+                })
             })
-        }),
+        }
     }
+}
+
+fn supports_embedded_metadata(format: Format) -> bool {
+    matches!(format, Format::Jpeg | Format::Png | Format::WebP)
+}
+
+fn effective_color_mode(requested: ColorProfileMode, target: Format) -> ColorProfileMode {
+    if requested == ColorProfileMode::Preserve && !supports_embedded_metadata(target) {
+        ColorProfileMode::BakeToSrgb
+    } else {
+        requested
+    }
+}
+
+fn apply_color_metadata(
+    output: Vec<u8>,
+    target: Format,
+    mode: ColorProfileMode,
+    source_icc: Option<&[u8]>,
+) -> Result<Vec<u8>> {
+    if !supports_embedded_metadata(target) {
+        return Ok(output);
+    }
+    let srgb;
+    let icc = match mode {
+        ColorProfileMode::Preserve => source_icc,
+        ColorProfileMode::BakeToSrgb => {
+            srgb = crate::metadata::srgb_profile_bytes()?;
+            Some(srgb.as_slice())
+        }
+    };
+    crate::metadata::write_metadata(output, None, icc)
 }
 
 pub(crate) fn run_preview_operation(
@@ -504,11 +574,12 @@ fn convert_bytes(
     data: &[u8],
     options: &ConvertOptions,
     threads: Option<usize>,
+    color_profile_mode: ColorProfileMode,
 ) -> Result<OperationOutput> {
     let quality = validate_quality(options.quality)?;
     let effort = validate_effort(options.effort)?;
     let target_format = crate::codec::parse_format(&options.target_format)?;
-    let source = decode_source_image(data)?;
+    let source = decode_source_image_with_color(data, color_profile_mode)?;
     let result = core_convert(
         &source.image,
         &PipelineOptions {
@@ -536,13 +607,14 @@ fn optimize_bytes(
     data: &[u8],
     options: &OptimizeOptions,
     threads: Option<usize>,
+    color_profile_mode: ColorProfileMode,
 ) -> Result<OperationOutput> {
     let quality = validate_quality(options.quality)?;
     let effort = validate_effort(options.effort)?;
     let total_start = Instant::now();
 
     let decode_start = Instant::now();
-    let source = decode_source_image(data)?;
+    let source = decode_source_image_with_color(data, color_profile_mode)?;
     let image = source.image;
     let format = source.format.core()?;
     let decode_elapsed = decode_start.elapsed();
@@ -583,11 +655,16 @@ fn optimize_bytes(
     })
 }
 
-fn transform_bytes<F>(data: &[u8], quality: u8, build: F) -> Result<OperationOutput>
+fn transform_bytes<F>(
+    data: &[u8],
+    quality: u8,
+    color_profile_mode: ColorProfileMode,
+    build: F,
+) -> Result<OperationOutput>
 where
     F: FnOnce(SourceFormat) -> Result<PipelineOptions>,
 {
-    let source = decode_source_image(data)?;
+    let source = decode_source_image_with_color(data, color_profile_mode)?;
     validate_quality(quality)?;
     let mut options = build(source.format)?;
     options.threads = encode_threads_for_format(options.format, options.threads);
@@ -845,6 +922,7 @@ mod tests {
     #[test]
     fn process_bytes_converts_to_webp() {
         let result = process_bytes(ProcessBytesRequest {
+            color_profile_mode: ColorProfileMode::Preserve,
             data: test_png_bytes(),
             operation: ImageOperation::Convert(ConvertOptions {
                 target_format: "webp".to_string(),
@@ -862,6 +940,7 @@ mod tests {
     #[test]
     fn process_bytes_converts_to_avif() {
         let result = process_bytes(ProcessBytesRequest {
+            color_profile_mode: ColorProfileMode::Preserve,
             data: test_png_bytes(),
             operation: ImageOperation::Convert(ConvertOptions {
                 target_format: "avif".to_string(),
@@ -936,6 +1015,7 @@ mod tests {
     #[test]
     fn process_bytes_rejects_invalid_scale() {
         let error = process_bytes(ProcessBytesRequest {
+            color_profile_mode: ColorProfileMode::Preserve,
             data: test_png_bytes(),
             operation: ImageOperation::Resize(ResizeOptions {
                 resize: ResizeSpec::Scale { factor: 0.0 },

@@ -4,10 +4,13 @@ use std::process::Command;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use img_parts::{DynImage, ImageICC};
+use moxcms::ColorProfile;
 use oimg_rust::api::bridge::{
-    self, AnalyzeFileRequest, BatchJobState, BatchProcessRequest, ConvertOptions, CropOptions,
-    CropSpec, ImageOperation, OptimizeOptions, PreviewArtifactRequest, PreviewFileRequest,
-    ProcessBytesRequest, ProcessFileBatchRequest, ProcessFileRequest, ResizeOptions, ResizeSpec,
+    self, AnalyzeFileRequest, BatchJobState, BatchProcessRequest, ColorProfileMode, ConvertOptions,
+    CropOptions, CropSpec, ImageOperation, OptimizeOptions, PreviewArtifactRequest,
+    PreviewFileRequest, ProcessBytesRequest, ProcessFileBatchRequest, ProcessFileRequest,
+    ResizeOptions, ResizeSpec,
 };
 use slimg_core::{convert, decode, Format, ImageData, PipelineOptions};
 use tempfile::tempdir;
@@ -66,6 +69,57 @@ fn png_bytes_with_size(width: u32, height: u32) -> Vec<u8> {
     )
     .unwrap()
     .data
+}
+
+fn png_with_display_p3_profile() -> (Vec<u8>, Vec<u8>) {
+    let profile = ColorProfile::new_display_p3().encode().unwrap();
+    let mut image = DynImage::from_bytes(png_bytes().into()).unwrap().unwrap();
+    image.set_icc_profile(Some(profile.clone().into()));
+    let mut encoded = Vec::new();
+    image.encoder().write_to(&mut encoded).unwrap();
+    (encoded, profile)
+}
+
+fn display_p3_sample_to_srgb(sample: &[u8]) -> [u8; 3] {
+    fn linearize(value: u8) -> f64 {
+        let value = f64::from(value) / 255.0;
+        if value <= 0.04045 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    fn encode(value: f64) -> u8 {
+        let value = value.clamp(0.0, 1.0);
+        let encoded = if value <= 0.003_130_8 {
+            value * 12.92
+        } else {
+            1.055 * value.powf(1.0 / 2.4) - 0.055
+        };
+        (encoded * 255.0).round() as u8
+    }
+
+    let r = linearize(sample[0]);
+    let g = linearize(sample[1]);
+    let b = linearize(sample[2]);
+    let x =
+        0.486_570_948_648_216_2 * r + 0.265_667_693_169_093_06 * g + 0.198_217_285_234_362_5 * b;
+    let y = 0.228_974_564_069_748_8 * r + 0.691_738_521_836_506_4 * g + 0.079_286_914_093_745 * b;
+    let z = 0.045_113_381_858_902_64 * g + 1.043_944_368_900_976 * b;
+
+    [
+        encode(
+            3.240_969_941_904_522_6 * x - 1.537_383_177_570_094 * y - 0.498_610_760_293_003_4 * z,
+        ),
+        encode(
+            -0.969_243_636_280_879_6 * x + 1.875_967_501_507_72 * y + 0.041_555_057_407_175_59 * z,
+        ),
+        encode(
+            0.055_630_079_696_993_66 * x - 0.203_976_958_888_976_52 * y
+                + 1.056_971_514_242_878_6 * z,
+        ),
+    ]
 }
 
 fn wait_for_job(job_id: &str) -> oimg_rust::api::bridge::BatchJobSnapshot {
@@ -144,6 +198,7 @@ fn inspect_and_preview_file_decode_heic_with_imageio() {
     assert_eq!(metadata.format, "heic");
 
     let preview = bridge::preview_file(PreviewFileRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
         input_path: heic_path.to_string_lossy().into_owned(),
         operation: ImageOperation::Convert(ConvertOptions {
             target_format: "jpeg".to_string(),
@@ -169,6 +224,7 @@ fn inspect_and_preview_file_decode_heic_with_imageio() {
 #[test]
 fn process_bytes_converts_to_webp() {
     let result = bridge::process_bytes(ProcessBytesRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
         data: png_bytes(),
         operation: ImageOperation::Convert(ConvertOptions {
             target_format: "webp".to_string(),
@@ -184,12 +240,115 @@ fn process_bytes_converts_to_webp() {
 }
 
 #[test]
+fn inspect_reports_exact_removable_color_profile_bytes() {
+    let (data, _) = png_with_display_p3_profile();
+    let metadata = bridge::inspect_bytes(data.clone()).unwrap();
+    let profile = metadata.color_profile.expect("expected color profile");
+
+    let mut stripped = DynImage::from_bytes(data.clone().into()).unwrap().unwrap();
+    stripped.set_icc_profile(None);
+
+    assert_eq!(profile.size_bytes, (data.len() - stripped.len()) as u64);
+    assert_eq!(metadata.metadata_size, profile.size_bytes);
+}
+
+#[test]
+fn process_bytes_preserves_native_profile_by_default_policy() {
+    let (data, profile) = png_with_display_p3_profile();
+    let result = bridge::process_bytes(ProcessBytesRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
+        data,
+        operation: ImageOperation::Convert(ConvertOptions {
+            target_format: "png".to_string(),
+            quality: 100,
+            effort: None,
+            png_palette: None,
+        }),
+    })
+    .unwrap();
+
+    let output = DynImage::from_bytes(result.encoded_bytes.into())
+        .unwrap()
+        .unwrap();
+    assert_eq!(output.icc_profile().unwrap().as_ref(), profile.as_slice());
+}
+
+#[test]
+fn process_bytes_bakes_wide_gamut_pixels_to_srgb() {
+    let (data, _) = png_with_display_p3_profile();
+    let source = decode(&data).unwrap().0;
+    let result = bridge::process_bytes(ProcessBytesRequest {
+        color_profile_mode: ColorProfileMode::BakeToSrgb,
+        data,
+        operation: ImageOperation::Convert(ConvertOptions {
+            target_format: "png".to_string(),
+            quality: 100,
+            effort: None,
+            png_palette: None,
+        }),
+    })
+    .unwrap();
+    let output_container = DynImage::from_bytes(result.encoded_bytes.clone().into())
+        .unwrap()
+        .unwrap();
+    let output_profile = output_container.icc_profile().unwrap();
+    let parsed = ColorProfile::new_from_slice(&output_profile).unwrap();
+    assert!(
+        parsed.description.is_some(),
+        "baked output should identify sRGB"
+    );
+
+    let output = decode(&result.encoded_bytes).unwrap().0;
+    assert_ne!(
+        output.data, source.data,
+        "baking must transform wide-gamut samples"
+    );
+    assert_eq!(output.data.len(), source.data.len());
+    for (source_pixel, output_pixel) in source.data.chunks_exact(4).zip(output.data.chunks_exact(4))
+    {
+        let expected = display_p3_sample_to_srgb(source_pixel);
+        for channel in 0..3 {
+            assert!(
+                output_pixel[channel].abs_diff(expected[channel]) <= 2,
+                "baked channel {channel} should match the independent P3-to-sRGB reference: source={source_pixel:?} expected={expected:?} actual={output_pixel:?}"
+            );
+        }
+        assert_eq!(
+            source_pixel[3], output_pixel[3],
+            "color conversion must preserve alpha"
+        );
+    }
+}
+
+#[test]
+fn process_bytes_rejects_malformed_color_profile() {
+    let mut image = DynImage::from_bytes(png_bytes().into()).unwrap().unwrap();
+    image.set_icc_profile(Some(vec![1, 2, 3, 4].into()));
+    let mut data = Vec::new();
+    image.encoder().write_to(&mut data).unwrap();
+
+    let error = bridge::process_bytes(ProcessBytesRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
+        data,
+        operation: ImageOperation::Convert(ConvertOptions {
+            target_format: "png".to_string(),
+            quality: 100,
+            effort: None,
+            png_palette: None,
+        }),
+    })
+    .unwrap_err();
+    assert!(error.to_string().contains("invalid source color profile"));
+}
+
+#[test]
 fn preview_file_crops_without_writing() {
     let dir = tempdir().unwrap();
     let input_path = dir.path().join("source.png");
     fs::write(&input_path, png_bytes()).unwrap();
 
     let preview = bridge::preview_file(PreviewFileRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
         input_path: input_path.to_string_lossy().into_owned(),
         operation: ImageOperation::Crop(CropOptions {
             crop: CropSpec::AspectRatio {
@@ -217,6 +376,7 @@ fn preview_file_converts_to_avif_with_metrics() {
     fs::write(&input_path, png_bytes()).unwrap();
 
     let preview = bridge::preview_file(PreviewFileRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
         input_path: input_path.to_string_lossy().into_owned(),
         operation: ImageOperation::Convert(ConvertOptions {
             target_format: "avif".to_string(),
@@ -245,6 +405,7 @@ fn preview_metric_rpcs_return_values_for_same_dimension_preview() {
     fs::write(&input_path, png_bytes()).unwrap();
 
     let preview = bridge::preview_file(PreviewFileRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
         input_path: input_path.to_string_lossy().into_owned(),
         operation: ImageOperation::Convert(ConvertOptions {
             target_format: "jpeg".to_string(),
@@ -299,6 +460,7 @@ fn preview_metric_rpcs_return_none_when_metric_cannot_be_computed() {
     fs::write(&input_path, png_bytes()).unwrap();
 
     let preview = bridge::preview_file(PreviewFileRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
         input_path: input_path.to_string_lossy().into_owned(),
         operation: ImageOperation::Resize(ResizeOptions {
             resize: ResizeSpec::Width { value: 24 },
@@ -340,6 +502,7 @@ fn dispose_preview_artifact_invalidates_followup_requests() {
     fs::write(&input_path, png_bytes()).unwrap();
 
     let preview = bridge::preview_file(PreviewFileRequest {
+        color_profile_mode: ColorProfileMode::Preserve,
         input_path: input_path.to_string_lossy().into_owned(),
         operation: ImageOperation::Convert(ConvertOptions {
             target_format: "jpeg".to_string(),
@@ -374,7 +537,7 @@ fn process_file_derives_suffixed_output_when_overwrite_is_false() {
         overwrite: false,
         preserve_file_dates: false,
         preserve_exif: false,
-        preserve_color_profile: false,
+        color_profile_mode: ColorProfileMode::Preserve,
         operation: ImageOperation::Resize(ResizeOptions {
             resize: ResizeSpec::Width { value: 24 },
             target_format: None,
@@ -408,7 +571,7 @@ fn process_file_reports_skipped_write_when_optimized_result_is_not_smaller() {
         overwrite: true,
         preserve_file_dates: false,
         preserve_exif: false,
-        preserve_color_profile: false,
+        color_profile_mode: ColorProfileMode::Preserve,
         operation: ImageOperation::Optimize(OptimizeOptions {
             quality: 100,
             effort: None,
@@ -478,7 +641,7 @@ fn process_file_batch_supports_mixed_operations() {
                 overwrite: true,
                 preserve_file_dates: false,
                 preserve_exif: false,
-                preserve_color_profile: false,
+                color_profile_mode: ColorProfileMode::Preserve,
                 operation: ImageOperation::Optimize(OptimizeOptions {
                     quality: 80,
                     effort: None,
@@ -492,7 +655,7 @@ fn process_file_batch_supports_mixed_operations() {
                 overwrite: true,
                 preserve_file_dates: false,
                 preserve_exif: false,
-                preserve_color_profile: false,
+                color_profile_mode: ColorProfileMode::Preserve,
                 operation: ImageOperation::Convert(ConvertOptions {
                     target_format: "jpeg".to_string(),
                     quality: 80,
@@ -534,7 +697,7 @@ fn process_file_batch_job_reports_progress_and_can_be_disposed() {
                 overwrite: true,
                 preserve_file_dates: false,
                 preserve_exif: false,
-                preserve_color_profile: false,
+                color_profile_mode: ColorProfileMode::Preserve,
                 operation: ImageOperation::Convert(ConvertOptions {
                     target_format: "jpeg".to_string(),
                     quality: 80,
@@ -548,7 +711,7 @@ fn process_file_batch_job_reports_progress_and_can_be_disposed() {
                 overwrite: true,
                 preserve_file_dates: false,
                 preserve_exif: false,
-                preserve_color_profile: false,
+                color_profile_mode: ColorProfileMode::Preserve,
                 operation: ImageOperation::Convert(ConvertOptions {
                     target_format: "jpeg".to_string(),
                     quality: 80,
@@ -603,7 +766,7 @@ fn cancel_process_file_batch_job_stops_remaining_files() {
             overwrite: true,
             preserve_file_dates: false,
             preserve_exif: false,
-            preserve_color_profile: false,
+            color_profile_mode: ColorProfileMode::Preserve,
             operation: ImageOperation::Convert(ConvertOptions {
                 target_format: "jpeg".to_string(),
                 quality: 90,

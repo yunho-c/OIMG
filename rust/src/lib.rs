@@ -8,6 +8,7 @@ mod error;
 mod execution;
 mod frb_generated;
 mod fs;
+mod metadata;
 mod metrics;
 mod preview;
 mod preview_artifacts;

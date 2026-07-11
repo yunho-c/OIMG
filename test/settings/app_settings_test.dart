@@ -254,7 +254,7 @@ void main() {
       expect(settings.preserveFolderStructure, isTrue);
       expect(settings.preserveOriginalDate, isFalse);
       expect(settings.preserveExif, isFalse);
-      expect(settings.preserveColorProfile, isFalse);
+      expect(settings.preserveColorProfile, isTrue);
       expect(settings.qualityMetricColorsEnabled, isFalse);
       expect(settings.similarityMetricColorsEnabled, isFalse);
       expect(settings.savingsColorsEnabled, isFalse);

@@ -184,7 +184,7 @@ class AppSettings {
     preserveFolderStructure: true,
     preserveOriginalDate: false,
     preserveExif: false,
-    preserveColorProfile: false,
+    preserveColorProfile: true,
     qualityMetricColorsEnabled: false,
     similarityMetricColorsEnabled: false,
     savingsColorsEnabled: false,

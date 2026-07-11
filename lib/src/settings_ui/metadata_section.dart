@@ -18,6 +18,10 @@ class _MetadataCollapsibleState extends ConsumerState<_MetadataCollapsible> {
     final notifier = ref.read(appSettingsProvider.notifier);
     final runState = ref.watch(optimizationRunControllerProvider);
     final analyzeState = ref.watch(analyzeRunControllerProvider);
+    final fileController = ref.watch(fileOpenControllerProvider);
+    final metadata = fileController.isFolderSelected
+        ? null
+        : fileController.currentFile?.metadata;
     final controlsLocked = runState.isRunning || analyzeState.isRunning;
 
     Widget option({
@@ -55,7 +59,20 @@ class _MetadataCollapsibleState extends ConsumerState<_MetadataCollapsible> {
             padding: const EdgeInsets.only(left: 10, right: 4),
             child: Row(
               children: [
-                Expanded(child: const Text('Metadata').small().medium()),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Text('Metadata').small().medium(),
+                      if (metadata != null &&
+                          metadata.metadataSize > BigInt.zero) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatBytes(metadata.metadataSize.toInt()),
+                        ).xSmall().muted(),
+                      ],
+                    ],
+                  ),
+                ),
                 GhostButton(
                   key: const ValueKey('metadata-collapsible-toggle'),
                   onPressed: () {
@@ -107,13 +124,17 @@ class _MetadataCollapsibleState extends ConsumerState<_MetadataCollapsible> {
                               key: const ValueKey(
                                 'metadata-preserve-color-profile',
                               ),
-                              label: 'Preserve color profile',
+                              label: metadata?.colorProfile == null
+                                  ? 'Preserve color'
+                                  : 'Preserve color  ·  ${_formatBytes(metadata!.colorProfile!.sizeBytes.toInt())}',
                               value: settings.preserveColorProfile,
                               onChanged: notifier.setPreserveColorProfile,
                             ),
                             option(
                               key: const ValueKey('metadata-preserve-exif'),
-                              label: 'Preserve camera info (EXIF)',
+                              label: metadata?.exif == null
+                                  ? 'Preserve camera info'
+                                  : 'Preserve camera info  ·  ${_formatBytes(metadata!.exif!.sizeBytes.toInt())}',
                               value: settings.preserveExif,
                               onChanged: notifier.setPreserveExif,
                             ),

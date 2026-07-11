@@ -69,6 +69,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CropOptions dco_decode_box_autoadd_crop_options(dynamic raw);
 
   @protected
+  EmbeddedMetadata dco_decode_box_autoadd_embedded_metadata(dynamic raw);
+
+  @protected
   ExtendOptions dco_decode_box_autoadd_extend_options(dynamic raw);
 
   @protected
@@ -129,6 +132,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_box_autoadd_u_8(dynamic raw);
 
   @protected
+  ColorProfileMode dco_decode_color_profile_mode(dynamic raw);
+
+  @protected
   ConvertOptions dco_decode_convert_options(dynamic raw);
 
   @protected
@@ -136,6 +142,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   CropSpec dco_decode_crop_spec(dynamic raw);
+
+  @protected
+  EmbeddedMetadata dco_decode_embedded_metadata(dynamic raw);
 
   @protected
   EncodedImageResult dco_decode_encoded_image_result(dynamic raw);
@@ -187,6 +196,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  EmbeddedMetadata? dco_decode_opt_box_autoadd_embedded_metadata(dynamic raw);
 
   @protected
   double? dco_decode_opt_box_autoadd_f_64(dynamic raw);
@@ -346,6 +358,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CropOptions sse_decode_box_autoadd_crop_options(SseDeserializer deserializer);
 
   @protected
+  EmbeddedMetadata sse_decode_box_autoadd_embedded_metadata(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ExtendOptions sse_decode_box_autoadd_extend_options(
     SseDeserializer deserializer,
   );
@@ -428,6 +445,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_box_autoadd_u_8(SseDeserializer deserializer);
 
   @protected
+  ColorProfileMode sse_decode_color_profile_mode(SseDeserializer deserializer);
+
+  @protected
   ConvertOptions sse_decode_convert_options(SseDeserializer deserializer);
 
   @protected
@@ -435,6 +455,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   CropSpec sse_decode_crop_spec(SseDeserializer deserializer);
+
+  @protected
+  EmbeddedMetadata sse_decode_embedded_metadata(SseDeserializer deserializer);
 
   @protected
   EncodedImageResult sse_decode_encoded_image_result(
@@ -494,6 +517,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  EmbeddedMetadata? sse_decode_opt_box_autoadd_embedded_metadata(
+    SseDeserializer deserializer,
+  );
 
   @protected
   double? sse_decode_opt_box_autoadd_f_64(SseDeserializer deserializer);
@@ -702,6 +730,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_embedded_metadata(
+    EmbeddedMetadata self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_extend_options(
     ExtendOptions self,
     SseSerializer serializer,
@@ -801,6 +835,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_u_8(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_color_profile_mode(
+    ColorProfileMode self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_convert_options(
     ConvertOptions self,
     SseSerializer serializer,
@@ -811,6 +851,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_crop_spec(CropSpec self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_embedded_metadata(
+    EmbeddedMetadata self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_encoded_image_result(
@@ -883,6 +929,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_embedded_metadata(
+    EmbeddedMetadata? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_f_64(double? self, SseSerializer serializer);

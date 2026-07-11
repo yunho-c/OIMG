@@ -300,7 +300,7 @@ mod tests {
                 overwrite: true,
                 preserve_file_dates: false,
                 preserve_exif: false,
-                preserve_color_profile: false,
+                color_profile_mode: crate::types::ColorProfileMode::Preserve,
                 operation: ImageOperation::Convert(ConvertOptions {
                     target_format: "avif".to_string(),
                     quality: 80,
@@ -328,7 +328,7 @@ mod tests {
                 overwrite: true,
                 preserve_file_dates: false,
                 preserve_exif: false,
-                preserve_color_profile: false,
+                color_profile_mode: crate::types::ColorProfileMode::Preserve,
                 operation: ImageOperation::Optimize(OptimizeOptions {
                     quality: 80,
                     effort: None,

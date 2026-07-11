@@ -245,7 +245,7 @@ fn build_batch_request(request: CompressionServiceRequest) -> Result<ProcessFile
             overwrite,
             preserve_file_dates: false,
             preserve_exif: false,
-            preserve_color_profile: false,
+            color_profile_mode: crate::types::ColorProfileMode::Preserve,
             operation,
         });
     }
@@ -303,7 +303,7 @@ fn process_save_as_path(
                 overwrite: true,
                 preserve_file_dates: false,
                 preserve_exif: false,
-                preserve_color_profile: false,
+                color_profile_mode: crate::types::ColorProfileMode::Preserve,
                 operation: ImageOperation::Convert(ConvertOptions {
                     target_format: target_format.to_string(),
                     quality: 80,

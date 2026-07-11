@@ -16,6 +16,21 @@ pub struct ImageMetadata {
     pub file_size: Option<u64>,
     pub has_transparency: bool,
     pub palette_suitability: Option<PaletteSuitability>,
+    pub color_profile: Option<EmbeddedMetadata>,
+    pub exif: Option<EmbeddedMetadata>,
+    pub metadata_size: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmbeddedMetadata {
+    pub label: String,
+    pub size_bytes: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorProfileMode {
+    Preserve,
+    BakeToSrgb,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,7 +186,7 @@ pub struct ProcessFileRequest {
     pub overwrite: bool,
     pub preserve_file_dates: bool,
     pub preserve_exif: bool,
-    pub preserve_color_profile: bool,
+    pub color_profile_mode: ColorProfileMode,
     pub operation: ImageOperation,
 }
 
@@ -179,6 +194,7 @@ pub struct ProcessFileRequest {
 pub struct ProcessBytesRequest {
     pub data: Vec<u8>,
     pub operation: ImageOperation,
+    pub color_profile_mode: ColorProfileMode,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -200,6 +216,7 @@ pub struct ProcessFileBatchRequest {
 pub struct PreviewFileRequest {
     pub input_path: String,
     pub operation: ImageOperation,
+    pub color_profile_mode: ColorProfileMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
