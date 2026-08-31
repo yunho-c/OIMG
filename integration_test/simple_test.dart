@@ -65,6 +65,11 @@ class _NoopFileOpenChannel implements FileOpenChannel {
   }
 
   @override
+  Future<bool> ensureWritableDirectoryAccess(List<String> paths) async {
+    return true;
+  }
+
+  @override
   Future<void> showInFileManager(String path) async {}
 }
 

@@ -156,6 +156,16 @@ class FileOpenController extends ChangeNotifier {
     return _channel.startAccessingSecurityScopedResource(bookmark);
   }
 
+  Future<bool> ensureWritableContainingDirectoryAccess(
+    Iterable<String> filePaths,
+  ) async {
+    final directoryPaths = filePaths
+        .map(p.dirname)
+        .toSet()
+        .toList(growable: false);
+    return _channel.ensureWritableDirectoryAccess(directoryPaths);
+  }
+
   Future<void> showInFileManager(String path) async {
     await _channel.showInFileManager(path);
   }

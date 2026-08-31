@@ -96,4 +96,35 @@ void main() {
 
     expect(didStart, isTrue);
   });
+
+  test('ensureWritableDirectoryAccess forwards directory paths', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'ensureWritableDirectoryAccess');
+          expect(call.arguments, ['/tmp/images', '/tmp/archive']);
+          return true;
+        });
+
+    final fileOpenChannel = MethodChannelFileOpenChannel(channel: channel);
+
+    final didStart = await fileOpenChannel.ensureWritableDirectoryAccess(const [
+      '/tmp/images',
+      '/tmp/archive',
+    ]);
+
+    expect(didStart, isTrue);
+  });
+
+  test(
+    'ensureWritableDirectoryAccess tolerates unsupported platforms',
+    () async {
+      final fileOpenChannel = MethodChannelFileOpenChannel(channel: channel);
+
+      final didStart = await fileOpenChannel.ensureWritableDirectoryAccess(
+        const ['/tmp/images'],
+      );
+
+      expect(didStart, isTrue);
+    },
+  );
 }

@@ -10,6 +10,7 @@ class AppDelegate: FlutterAppDelegate {
   private var fileOpenChannelReady = false
   private let compressionServiceProvider = CompressionServiceProvider()
   private var securityScopedUrlsByPath: [String: URL] = [:]
+  private var securityScopedDirectoryUrlsByPath: [String: URL] = [:]
 
   func attachFileOpenChannel(to controller: FlutterViewController) {
     guard fileOpenChannel == nil else {
@@ -55,6 +56,12 @@ class AppDelegate: FlutterAppDelegate {
           return
         }
         result(self.startAccessingSecurityScopedResource(bookmark: bookmark))
+      } else if call.method == "ensureWritableDirectoryAccess" {
+        guard let paths = call.arguments as? [String] else {
+          result(false)
+          return
+        }
+        result(self.ensureWritableDirectoryAccess(paths: paths))
       } else if call.method == "showInFileManager" {
         if let path = call.arguments as? String {
           self.showInFileManager(path: path)
@@ -136,7 +143,8 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   private func retainSecurityScopedAccess(for urls: [URL]) {
-    for url in urls where url.isFileURL {
+    for selectedUrl in urls where selectedUrl.isFileURL {
+      let url = canonicalFileUrl(selectedUrl)
       let path = url.path
       if securityScopedUrlsByPath[path] != nil {
         continue
@@ -144,6 +152,9 @@ class AppDelegate: FlutterAppDelegate {
 
       if url.startAccessingSecurityScopedResource() {
         securityScopedUrlsByPath[path] = url
+        if isDirectory(url) {
+          securityScopedDirectoryUrlsByPath[path] = url
+        }
       }
     }
   }
@@ -165,11 +176,75 @@ class AppDelegate: FlutterAppDelegate {
         return false
       }
 
-      securityScopedUrlsByPath[url.path] = url
+      let canonicalUrl = canonicalFileUrl(url)
+      securityScopedUrlsByPath[canonicalUrl.path] = canonicalUrl
+      if isDirectory(canonicalUrl) {
+        securityScopedDirectoryUrlsByPath[canonicalUrl.path] = canonicalUrl
+      }
       return true
     } catch {
       return false
     }
+  }
+
+  private func ensureWritableDirectoryAccess(paths: [String]) -> Bool {
+    var seenPaths = Set<String>()
+    let directoryUrls = paths
+      .filter { !$0.isEmpty }
+      .map { canonicalFileUrl(URL(fileURLWithPath: $0, isDirectory: true)) }
+      .filter { seenPaths.insert($0.path).inserted }
+
+    for directoryUrl in directoryUrls {
+      if hasSecurityScopedDirectoryAccess(to: directoryUrl) {
+        continue
+      }
+
+      let panel = NSOpenPanel()
+      panel.canChooseFiles = false
+      panel.canChooseDirectories = true
+      panel.allowsMultipleSelection = false
+      panel.resolvesAliases = true
+      panel.canCreateDirectories = false
+      panel.treatsFilePackagesAsDirectories = false
+      panel.directoryURL = directoryUrl.deletingLastPathComponent()
+      panel.title = "Choose Save Folder"
+      panel.message = "Choose \u{201c}\(directoryUrl.lastPathComponent)\u{201d} or a containing folder."
+      panel.prompt = "Choose"
+
+      guard panel.runModal() == .OK,
+            let selectedUrl = panel.urls.first,
+            selectedUrl.isFileURL
+      else {
+        return false
+      }
+
+      retainSecurityScopedAccess(for: [selectedUrl])
+      guard hasSecurityScopedDirectoryAccess(to: directoryUrl) else {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  private func hasSecurityScopedDirectoryAccess(to directoryUrl: URL) -> Bool {
+    let directoryPath = canonicalFileUrl(directoryUrl).path
+    return securityScopedDirectoryUrlsByPath.keys.contains { scopedPath in
+      if scopedPath == "/" || directoryPath == scopedPath {
+        return true
+      }
+      return directoryPath.hasPrefix(scopedPath + "/")
+    }
+  }
+
+  private func canonicalFileUrl(_ url: URL) -> URL {
+    url.standardizedFileURL.resolvingSymlinksInPath()
+  }
+
+  private func isDirectory(_ url: URL) -> Bool {
+    var isDirectory: ObjCBool = false
+    return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+      && isDirectory.boolValue
   }
 
   private func securityScopedBookmarkString(for url: URL) -> String? {

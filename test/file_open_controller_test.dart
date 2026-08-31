@@ -10,6 +10,27 @@ import 'package:path/path.dart' as p;
 
 void main() {
   group('FileOpenController', () {
+    test(
+      'requests unique containing directories for writable access',
+      () async {
+        final channel = _FakeFileOpenChannel();
+        final controller = FileOpenController(
+          channel: channel,
+          slimg: _FakeSlimgApi(inspectResults: const {}),
+        );
+
+        final didStart = await controller
+            .ensureWritableContainingDirectoryAccess(const [
+              '/tmp/images/first.png',
+              '/tmp/images/second.png',
+              '/tmp/archive/third.png',
+            ]);
+
+        expect(didStart, isTrue);
+        expect(channel.writableDirectoryPaths, ['/tmp/images', '/tmp/archive']);
+      },
+    );
+
     test('accepts files that slimg can inspect', () async {
       final controller = FileOpenController(
         channel: _FakeFileOpenChannel(),
@@ -520,6 +541,7 @@ ImageMetadata _metadata(String format) {
 
 class _FakeFileOpenChannel implements FileOpenChannel {
   final List<String> shownPaths = <String>[];
+  List<String>? writableDirectoryPaths;
 
   @override
   Future<void> bind(OpenFilesHandler onOpenFiles) async {}
@@ -542,6 +564,12 @@ class _FakeFileOpenChannel implements FileOpenChannel {
   @override
   Future<bool> startAccessingSecurityScopedResource(String bookmark) async {
     return false;
+  }
+
+  @override
+  Future<bool> ensureWritableDirectoryAccess(List<String> paths) async {
+    writableDirectoryPaths = paths;
+    return true;
   }
 
   @override

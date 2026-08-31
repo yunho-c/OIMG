@@ -57,13 +57,18 @@ class _BottomSidebarState extends ConsumerState<_BottomSidebar> {
       _stopOptimizeProgressTimer();
     }
 
+    final hasItemFailures = next.items.values.any(
+      (item) => item.status == OptimizationItemStatus.failed,
+    );
     if (next.jobState == BatchJobState.completed &&
+        !hasItemFailures &&
         previous?.jobState != BatchJobState.completed) {
       _showOptimizeSuccessState();
       return;
     }
 
-    if (next.jobState == BatchJobState.failed ||
+    if (hasItemFailures ||
+        next.jobState == BatchJobState.failed ||
         next.jobState == BatchJobState.canceled) {
       _clearOptimizeSuccess();
     }

@@ -28,6 +28,8 @@ abstract class FileOpenChannel {
     return false;
   }
 
+  Future<bool> ensureWritableDirectoryAccess(List<String> paths);
+
   Future<void> showInFileManager(String path);
 }
 
@@ -135,6 +137,22 @@ class MethodChannelFileOpenChannel implements FileOpenChannel {
       return result ?? false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  @override
+  Future<bool> ensureWritableDirectoryAccess(List<String> paths) async {
+    if (paths.isEmpty) {
+      return true;
+    }
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'ensureWritableDirectoryAccess',
+        paths,
+      );
+      return result ?? false;
+    } on MissingPluginException {
+      return true;
     }
   }
 

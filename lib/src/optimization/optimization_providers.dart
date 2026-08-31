@@ -1671,8 +1671,19 @@ class OptimizationRunController extends Notifier<OptimizationRunState> {
 
     final fileController = ref.read(fileOpenControllerProvider);
     final settings = await ref.read(appSettingsProvider.future);
-    if (settings.storageDestinationMode ==
-        StorageDestinationMode.differentLocation) {
+    if (settings.storageDestinationMode == StorageDestinationMode.sameFolder) {
+      final didStartAccess = await fileController
+          .ensureWritableContainingDirectoryAccess(
+            files.map((file) => file.path),
+          );
+      if (!didStartAccess) {
+        state = _idleState(
+          items: state.items,
+          globalError: 'Choose the save folder to continue.',
+        );
+        return;
+      }
+    } else {
       final bookmark = settings.differentLocationBookmark;
       final didStartAccess = await fileController
           .startAccessingSecurityScopedResource(bookmark);
@@ -1790,13 +1801,19 @@ class OptimizationRunController extends Notifier<OptimizationRunState> {
         await _applySnapshot(jobId, snapshot);
         if (_isTerminalJobState(snapshot.state)) {
           await _disposeJob(jobId);
+          final terminalItems = _buildItemsForSnapshot(snapshot);
+          final hasItemFailures = terminalItems.values.any(
+            (item) => item.status == OptimizationItemStatus.failed,
+          );
           DeveloperDiagnostics.logTiming(
             'optimize-run',
             'job-terminal jobId=$jobId state=${snapshot.state.name} error=${snapshot.error}',
           );
           state = _idleState(
-            items: _buildItemsForSnapshot(snapshot),
-            globalError: snapshot.error?.toString(),
+            items: terminalItems,
+            globalError:
+                snapshot.error?.toString() ??
+                (hasItemFailures ? 'Some images could not be saved.' : null),
           );
           _activeInputPaths = const <String>[];
           _keepSourceEntryPaths = const <String>{};

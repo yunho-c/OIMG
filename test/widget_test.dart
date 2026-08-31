@@ -3355,8 +3355,9 @@ void main() {
       },
       batchDelay: const Duration(milliseconds: 1),
     );
+    final channel = _FakeFileOpenChannel();
     final controller = FileOpenController(
-      channel: _FakeFileOpenChannel(),
+      channel: channel,
       slimg: slimg,
       initialPaths: const ['/tmp/first.png', '/tmp/second.jpg'],
     );
@@ -3376,6 +3377,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final batch = slimg.lastBatchRequest!;
+    expect(channel.lastWritableDirectoryPaths, ['/tmp']);
     expect(batch.requests.length, 2);
     expect(batch.requests[0].outputPath, '/tmp/first.jpeg');
     expect(batch.requests[1].outputPath, isNull);
@@ -3451,14 +3453,14 @@ void main() {
 
     final slimg = _FakeSlimgApi(
       inspectResults: {
-        '/tmp/first.png': _metadata('png', 2400),
+        '/tmp/first.jpg': _metadata('jpeg', 2400),
         '/tmp/second.jpg': _metadata('jpeg', 1800),
       },
     );
     final controller = FileOpenController(
       channel: _FakeFileOpenChannel(),
       slimg: slimg,
-      initialPaths: const ['/tmp/first.png', '/tmp/second.jpg'],
+      initialPaths: const ['/tmp/first.jpg', '/tmp/second.jpg'],
     );
     await controller.initialize();
 
@@ -3478,6 +3480,68 @@ void main() {
     expect(find.text('Success!'), findsOneWidget);
     expect(find.text('Optimize'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'same-folder optimize stops when save-folder access is canceled',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1400, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final channel = _FakeFileOpenChannel()
+        ..writableDirectoryAccessResult = false;
+      final slimg = _FakeSlimgApi(
+        inspectResults: {'/tmp/first.png': _metadata('png', 2400)},
+      );
+      final controller = FileOpenController(
+        channel: channel,
+        slimg: slimg,
+        initialPaths: const ['/tmp/first.png'],
+      );
+      await controller.initialize();
+
+      await tester.pumpWidget(_buildApp(controller: controller, slimg: slimg));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      await tester.tap(find.text('Optimize'));
+      await tester.pump();
+
+      expect(channel.lastWritableDirectoryPaths, ['/tmp']);
+      expect(slimg.lastBatchRequest, isNull);
+      expect(find.text('Choose the save folder to continue.'), findsOneWidget);
+      expect(find.text('Success!'), findsNothing);
+    },
+  );
+
+  testWidgets('completed batch with a failed item does not show success', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final slimg = _FakeSlimgApi(
+      inspectResults: {'/tmp/first.png': _metadata('png', 2400)},
+      batchFailurePaths: const {'/tmp/first.png'},
+    );
+    final controller = FileOpenController(
+      channel: _FakeFileOpenChannel(),
+      slimg: slimg,
+      initialPaths: const ['/tmp/first.png'],
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(_buildApp(controller: controller, slimg: slimg));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.tap(find.text('Optimize'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('Success!'), findsNothing);
+    expect(find.text('Optimize'), findsOneWidget);
+    expect(find.text('Some images could not be saved.'), findsOneWidget);
   });
 
   testWidgets('developer dialog toggles persisted timing logs', (tester) async {
@@ -4901,6 +4965,8 @@ class _FakeFileOpenChannel implements FileOpenChannel {
   int pickFilesCallCount = 0;
   int pickFolderCallCount = 0;
   String? lastStartedSecurityScopedBookmark;
+  List<String>? lastWritableDirectoryPaths;
+  bool writableDirectoryAccessResult = true;
 
   @override
   Future<void> bind(OpenFilesHandler onOpenFiles) async {
@@ -4939,6 +5005,12 @@ class _FakeFileOpenChannel implements FileOpenChannel {
   }
 
   @override
+  Future<bool> ensureWritableDirectoryAccess(List<String> paths) async {
+    lastWritableDirectoryPaths = paths;
+    return writableDirectoryAccessResult;
+  }
+
+  @override
   Future<void> showInFileManager(String path) async {
     shownPaths.add(path);
   }
@@ -4961,11 +5033,13 @@ class _FakeSlimgApi implements SlimgApi {
     Map<String, ImageMetadata>? inspectResults,
     this.previewDelay = Duration.zero,
     this.batchDelay = Duration.zero,
+    this.batchFailurePaths = const <String>{},
   }) : inspectResults = inspectResults ?? {};
 
   final Map<String, ImageMetadata> inspectResults;
   final Duration previewDelay;
   final Duration batchDelay;
+  final Set<String> batchFailurePaths;
   ProcessFileBatchRequest? lastBatchRequest;
   bool lastTimingLogsEnabled = false;
   int previewCallCount = 0;
@@ -5268,22 +5342,24 @@ class _FakeSlimgApi implements SlimgApi {
         await Future<void>.delayed(batchDelay);
       }
 
+      final shouldFail = batchFailurePaths.contains(item.inputPath);
+      final result = shouldFail
+          ? BatchItemResult(inputPath: item.inputPath, success: false)
+          : BatchItemResult(
+              inputPath: item.inputPath,
+              success: true,
+              result: ProcessResult(
+                outputPath: item.outputPath ?? item.inputPath,
+                format: 'jpeg',
+                width: 48,
+                height: 32,
+                originalSize: BigInt.from(2400),
+                newSize: BigInt.from(900),
+                didWrite: true,
+              ),
+            );
       final results = List<BatchItemResult>.from(job.snapshot.results)
-        ..add(
-          BatchItemResult(
-            inputPath: item.inputPath,
-            success: true,
-            result: ProcessResult(
-              outputPath: item.outputPath ?? item.inputPath,
-              format: 'jpeg',
-              width: 48,
-              height: 32,
-              originalSize: BigInt.from(2400),
-              newSize: BigInt.from(900),
-              didWrite: true,
-            ),
-          ),
-        );
+        ..add(result);
 
       job.snapshot = BatchJobSnapshot(
         jobId: job.snapshot.jobId,
