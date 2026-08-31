@@ -37,6 +37,7 @@ class _FileDropSurfaceState extends ConsumerState<_FileDropSurface> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isOpening = ref.watch(fileOpenControllerProvider).isOpening;
     if (!_dropSurfaceReady) {
       return widget.child;
     }
@@ -118,13 +119,22 @@ class _FileDropSurfaceState extends ConsumerState<_FileDropSurface> {
                 ),
               ),
             ),
+          if (isOpening)
+            Positioned.fill(
+              child: AbsorbPointer(
+                child: ColoredBox(
+                  color: theme.colorScheme.background.withValues(alpha: 0.72),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
   Future<List<String>> _readDroppedPaths(PerformDropEvent event) async {
-    final paths = <String>[];
+    final pendingUris = <Future<Uri?>>[];
 
     for (final item in event.session.items) {
       final reader = item.dataReader;
@@ -132,7 +142,11 @@ class _FileDropSurfaceState extends ConsumerState<_FileDropSurface> {
         continue;
       }
 
-      final uri = await _readDroppedFileUri(reader);
+      pendingUris.add(_readDroppedFileUri(reader));
+    }
+
+    final paths = <String>[];
+    for (final uri in await Future.wait(pendingUris)) {
       if (uri == null || uri.scheme != 'file') {
         continue;
       }

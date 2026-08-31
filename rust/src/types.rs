@@ -14,8 +14,7 @@ pub struct ImageMetadata {
     pub height: u32,
     pub format: String,
     pub file_size: Option<u64>,
-    pub has_transparency: bool,
-    pub palette_suitability: Option<PaletteSuitability>,
+    pub has_transparency: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,7 +33,7 @@ pub struct PaletteSuitability {
     pub recommendation: PaletteRecommendation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PreviewResult {
     pub encoded_bytes: Vec<u8>,
     pub artifact_id: String,
@@ -42,6 +41,8 @@ pub struct PreviewResult {
     pub width: u32,
     pub height: u32,
     pub size_bytes: u64,
+    pub source_has_transparency: bool,
+    pub palette_suitability: Option<PaletteSuitability>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

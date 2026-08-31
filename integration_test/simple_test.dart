@@ -88,6 +88,7 @@ class _FakeSlimgApi implements SlimgApi {
       width: 1,
       height: 1,
       sizeBytes: BigInt.one,
+      sourceHasTransparency: false,
     );
   }
 

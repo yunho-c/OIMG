@@ -11,6 +11,7 @@ class _SettingsSidebar extends ConsumerWidget {
     final notifier = ref.read(appSettingsProvider.notifier);
     final runState = ref.watch(optimizationRunControllerProvider);
     final analyzeState = ref.watch(analyzeRunControllerProvider);
+    final preview = ref.watch(currentPreviewProvider).asData?.value;
     final controlsLocked = runState.isRunning || analyzeState.isRunning;
     final showAnalyzePanel =
         analyzeState.isRunning ||
@@ -23,9 +24,11 @@ class _SettingsSidebar extends ConsumerWidget {
     }) {
       final transparencyWarning = _transparencyWarningText(
         settings: settings,
-        file: fileController.isFolderSelected
-            ? null
-            : fileController.currentFile,
+        hasTransparency:
+            !fileController.isFolderSelected &&
+            (preview?.result.sourceHasTransparency ??
+                fileController.currentFile?.metadata.hasTransparency ??
+                false),
       );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -110,7 +110,7 @@ fn inspect_bytes_reports_png_dimensions() {
     assert_eq!(metadata.height, 32);
     assert_eq!(metadata.format, "png");
     assert_eq!(metadata.file_size, None);
-    assert!(!metadata.has_transparency);
+    assert_eq!(metadata.has_transparency, None);
 }
 
 #[cfg(target_os = "macos")]
@@ -208,6 +208,8 @@ fn preview_file_crops_without_writing() {
     assert_eq!(format, Format::Png);
     assert_eq!(decoded.width, 32);
     assert_eq!(decoded.height, 32);
+    assert!(!preview.source_has_transparency);
+    assert!(preview.palette_suitability.is_some());
 }
 
 #[test]
@@ -229,6 +231,8 @@ fn preview_file_converts_to_avif_with_metrics() {
 
     assert_eq!(preview.format, "avif");
     assert_eq!(&preview.encoded_bytes[4..8], b"ftyp");
+    assert!(!preview.source_has_transparency);
+    assert!(preview.palette_suitability.is_none());
     let pixel_match = bridge::compute_preview_pixel_match_percentage(PreviewArtifactRequest {
         artifact_id: preview.artifact_id.clone(),
     })

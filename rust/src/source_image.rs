@@ -1,4 +1,7 @@
-use slimg_core::{decode, Format, ImageData};
+use std::io::{BufRead, Cursor, Seek};
+
+use imagesize::{Compression, ImageError, ImageType};
+use slimg_core::{codec::get_codec, Format, ImageData};
 
 use crate::error::{Result, SlimgBridgeError};
 
@@ -36,32 +39,55 @@ pub(crate) struct SourceImage {
     pub(crate) format: SourceFormat,
 }
 
-pub(crate) fn decode_source_image(data: &[u8]) -> Result<SourceImage> {
-    if is_heic(data) {
-        return decode_heic(data).map(|image| SourceImage {
-            image,
-            format: SourceFormat::Heic,
-        });
-    }
-
-    let (image, format) = decode(data)?;
-    Ok(SourceImage {
-        image,
-        format: SourceFormat::Core(format),
-    })
+pub(crate) fn detect_source_format<R: BufRead + Seek>(
+    reader: &mut R,
+) -> Result<(SourceFormat, ImageType)> {
+    let image_type = imagesize::reader_type(&mut *reader).map_err(map_probe_error)?;
+    let format = match image_type {
+        ImageType::Jpeg => SourceFormat::Core(Format::Jpeg),
+        ImageType::Png => SourceFormat::Core(Format::Png),
+        ImageType::Webp => SourceFormat::Core(Format::WebP),
+        ImageType::Jxl => SourceFormat::Core(Format::Jxl),
+        ImageType::Qoi => SourceFormat::Core(Format::Qoi),
+        ImageType::Heif(Compression::Av1) => SourceFormat::Core(Format::Avif),
+        #[cfg(target_os = "macos")]
+        ImageType::Heif(Compression::Hevc) => SourceFormat::Heic,
+        #[cfg(not(target_os = "macos"))]
+        ImageType::Heif(Compression::Hevc) => {
+            return Err(SlimgBridgeError::UnsupportedFormat {
+                format: "heic".to_string(),
+            })
+        }
+        _ => {
+            return Err(SlimgBridgeError::UnknownFormat {
+                detail: "unsupported image container".to_string(),
+            })
+        }
+    };
+    Ok((format, image_type))
 }
 
-fn is_heic(data: &[u8]) -> bool {
-    if data.len() < 12 || &data[4..8] != b"ftyp" {
-        return false;
-    }
+pub(crate) fn decode_source_image(data: &[u8]) -> Result<SourceImage> {
+    let (format, _) = detect_source_format(&mut Cursor::new(data))?;
+    let image = match format {
+        SourceFormat::Core(format) => get_codec(format).decode(data)?,
+        SourceFormat::Heic => decode_heic(data)?,
+    };
+    Ok(SourceImage { image, format })
+}
 
-    data[8..].chunks_exact(4).any(|brand| {
-        matches!(
-            brand,
-            b"heic" | b"heix" | b"hevc" | b"hevx" | b"heim" | b"heis" | b"hevm" | b"hevs"
-        )
-    })
+pub(crate) fn map_probe_error(error: ImageError) -> SlimgBridgeError {
+    match error {
+        ImageError::NotSupported => SlimgBridgeError::UnknownFormat {
+            detail: "unrecognized image header".to_string(),
+        },
+        ImageError::CorruptedImage => SlimgBridgeError::Decode {
+            message: "image header is incomplete or corrupt".to_string(),
+        },
+        ImageError::IoError(error) => SlimgBridgeError::Io {
+            message: error.to_string(),
+        },
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -268,17 +294,23 @@ mod tests {
 
     #[test]
     fn detects_heic_brands() {
-        let mut data = b"\0\0\0\x18ftypheic\0\0\0\0mif1heic".to_vec();
-        assert!(is_heic(&data));
-
-        data[8..12].copy_from_slice(b"avif");
-        assert!(is_heic(&data));
+        let data = b"\0\0\0\x18ftypheic\0\0\0\0mif1heic";
+        let detected = detect_source_format(&mut Cursor::new(data));
+        #[cfg(target_os = "macos")]
+        assert!(matches!(detected, Ok((SourceFormat::Heic, _))));
+        #[cfg(not(target_os = "macos"))]
+        assert!(matches!(
+            detected,
+            Err(SlimgBridgeError::UnsupportedFormat { format }) if format == "heic"
+        ));
     }
 
     #[test]
-    fn ignores_non_heic_brands() {
-        assert!(!is_heic(b""));
-        assert!(!is_heic(b"\0\0\0\x18ftypavif\0\0\0\0mif1avif"));
-        assert!(!is_heic(b"\0\0\0\x18ftypmif1\0\0\0\0msf1iso8"));
+    fn detects_avif_as_a_core_format() {
+        let data = b"\0\0\0\x18ftypavif\0\0\0\0mif1avif";
+        assert!(matches!(
+            detect_source_format(&mut Cursor::new(data)),
+            Ok((SourceFormat::Core(Format::Avif), _))
+        ));
     }
 }

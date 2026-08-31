@@ -1,4 +1,5 @@
-use std::fs;
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Cursor, Seek};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -16,7 +17,10 @@ use crate::codec::format_to_string;
 use crate::error::{Result, SlimgBridgeError};
 use crate::fs::{derive_output_path, safe_write_bytes, to_path_buf};
 use crate::preview_artifacts::{preview_artifact_store, PreviewArtifact};
-use crate::source_image::{decode_source_image, SourceFormat};
+use crate::source_image::{
+    decode_source_image, detect_source_format as detect_source_format_from_reader, map_probe_error,
+    SourceFormat,
+};
 use crate::types::{
     BatchItemResult, BatchProcessRequest, ConvertOptions, CropSpec, EncodedImageResult, ExtendSpec,
     FillSpec, ImageMetadata, ImageOperation, OptimizeOptions, PreviewResult, ProcessBytesRequest,
@@ -25,10 +29,9 @@ use crate::types::{
 
 pub(crate) fn inspect_file(input_path: String) -> Result<ImageMetadata> {
     let path = read_existing_input_path(&input_path)?;
-    let data = fs::read(&path).map_err(|error| map_input_io(&path, error))?;
-    let mut metadata = inspect_bytes(data)?;
-    metadata.file_size = Some(fs::metadata(&path)?.len());
-    Ok(metadata)
+    let file = File::open(&path).map_err(|error| map_input_io(&path, error))?;
+    let file_size = file.metadata()?.len();
+    inspect_reader(&mut BufReader::new(file), Some(file_size))
 }
 
 pub(crate) fn inspect_bytes(data: Vec<u8>) -> Result<ImageMetadata> {
@@ -36,15 +39,31 @@ pub(crate) fn inspect_bytes(data: Vec<u8>) -> Result<ImageMetadata> {
         return Err(SlimgBridgeError::invalid_request("data must not be empty"));
     }
 
-    let source = decode_source_image(&data)?;
-    let image = source.image;
+    inspect_reader(&mut Cursor::new(data), None)
+}
+
+fn inspect_reader<R: BufRead + Seek>(
+    reader: &mut R,
+    file_size: Option<u64>,
+) -> Result<ImageMetadata> {
+    let (format, image_type) = detect_source_format_from_reader(reader)?;
+    let dimensions = image_type.reader_size(reader).map_err(map_probe_error)?;
+    let width = u32::try_from(dimensions.width)
+        .map_err(|_| SlimgBridgeError::invalid_request("image width is too large"))?;
+    let height = u32::try_from(dimensions.height)
+        .map_err(|_| SlimgBridgeError::invalid_request("image height is too large"))?;
+    if width == 0 || height == 0 {
+        return Err(SlimgBridgeError::invalid_request(
+            "image dimensions must be greater than zero",
+        ));
+    }
+
     Ok(ImageMetadata {
-        width: image.width,
-        height: image.height,
-        format: source.format.id().to_string(),
-        file_size: None,
-        has_transparency: image.data.chunks_exact(4).any(|pixel| pixel[3] < 255),
-        palette_suitability: Some(analyze_palette_suitability(&image).into()),
+        width,
+        height,
+        format: format.id().to_string(),
+        file_size,
+        has_transparency: None,
     })
 }
 
@@ -78,6 +97,18 @@ pub(crate) fn preview_file(request: crate::types::PreviewFileRequest) -> Result<
 
         let operation_start = Instant::now();
         let source = decode_source_image(&data)?;
+        let palette_stats = should_analyze_palette_for_preview(&request.operation, source.format)?
+            .then(|| analyze_palette_suitability(&source.image));
+        let source_has_transparency = palette_stats.as_ref().map_or_else(
+            || {
+                source
+                    .image
+                    .data
+                    .chunks_exact(4)
+                    .any(|pixel| pixel[3] < 255)
+            },
+            |stats| stats.has_alpha,
+        );
         let output = run_preview_operation(&source.image, source.format, &request.operation, None)?;
         let operation_elapsed = operation_start.elapsed();
         crate::diagnostics::timing_log(format!(
@@ -102,6 +133,8 @@ pub(crate) fn preview_file(request: crate::types::PreviewFileRequest) -> Result<
             width: output.width,
             height: output.height,
             size_bytes: output.data.len() as u64,
+            source_has_transparency,
+            palette_suitability: palette_stats.map(Into::into),
         })
     })();
 
@@ -283,7 +316,11 @@ fn process_file_path_with_metadata(
         width: output.width,
         height: output.height,
         original_size: input_bytes.len() as u64,
-        new_size: output.data.len() as u64,
+        new_size: if output.should_write {
+            output.data.len() as u64
+        } else {
+            input_bytes.len() as u64
+        },
         did_write: output.should_write,
     };
     crate::diagnostics::timing_log(format!(
@@ -602,7 +639,25 @@ where
 }
 
 fn detect_source_format(data: &[u8]) -> Result<SourceFormat> {
-    Ok(decode_source_image(data)?.format)
+    Ok(detect_source_format_from_reader(&mut Cursor::new(data))?.0)
+}
+
+fn should_analyze_palette_for_preview(
+    operation: &ImageOperation,
+    source_format: SourceFormat,
+) -> Result<bool> {
+    if resolve_output_format(operation, source_format)? != Format::Png {
+        return Ok(false);
+    }
+
+    let palette_mode = match operation {
+        ImageOperation::Convert(options) => options.png_palette,
+        ImageOperation::Optimize(options) => options.png_palette,
+        ImageOperation::Resize(options) => options.png_palette,
+        ImageOperation::Crop(options) => options.png_palette,
+        ImageOperation::Extend(options) => options.png_palette,
+    };
+    Ok(map_png_palette(palette_mode) == CorePngPaletteMode::Off)
 }
 
 fn resolve_output_format(
@@ -794,7 +849,7 @@ fn map_input_io(path: &Path, error: std::io::Error) -> SlimgBridgeError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ProcessBytesRequest, ResizeOptions, ResizeSpec};
+    use crate::types::{PngPaletteMode, ProcessBytesRequest, ResizeOptions, ResizeSpec};
     use slimg_core::{ImageData, PipelineOptions};
 
     fn test_png_bytes() -> Vec<u8> {
@@ -839,7 +894,43 @@ mod tests {
         assert_eq!(metadata.height, 24);
         assert_eq!(metadata.format, "png");
         assert_eq!(metadata.file_size, None);
-        assert!(!metadata.has_transparency);
+        assert_eq!(metadata.has_transparency, None);
+    }
+
+    #[test]
+    fn inspect_bytes_only_requires_the_image_header() {
+        let bytes = test_png_bytes();
+        let metadata = inspect_bytes(bytes[..24].to_vec()).unwrap();
+
+        assert_eq!((metadata.width, metadata.height), (32, 24));
+        assert_eq!(metadata.format, "png");
+    }
+
+    #[test]
+    fn palette_advice_is_only_computed_for_png_with_palette_disabled() {
+        let source_format = SourceFormat::Core(Format::Png);
+        let png_off = ImageOperation::Optimize(OptimizeOptions {
+            quality: 100,
+            effort: None,
+            png_palette: Some(PngPaletteMode::Off),
+            write_only_if_smaller: true,
+        });
+        let png_auto = ImageOperation::Optimize(OptimizeOptions {
+            quality: 100,
+            effort: None,
+            png_palette: Some(PngPaletteMode::Auto),
+            write_only_if_smaller: true,
+        });
+        let jpeg = ImageOperation::Convert(ConvertOptions {
+            target_format: "jpeg".to_string(),
+            quality: 80,
+            effort: None,
+            png_palette: None,
+        });
+
+        assert!(should_analyze_palette_for_preview(&png_off, source_format).unwrap());
+        assert!(!should_analyze_palette_for_preview(&png_auto, source_format).unwrap());
+        assert!(!should_analyze_palette_for_preview(&jpeg, source_format).unwrap());
     }
 
     #[test]

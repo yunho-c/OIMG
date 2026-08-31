@@ -5018,6 +5018,8 @@ class _FakeSlimgApi implements SlimgApi {
       width: 48,
       height: 32,
       sizeBytes: BigInt.from(previewSizeBytes),
+      sourceHasTransparency:
+          inspectResults[request.inputPath]?.hasTransparency ?? false,
     );
   }
 
