@@ -68,8 +68,7 @@ String _pngPaletteLabel(PngPalettePreference mode) {
   };
 }
 
-String? _paletteSuggestionLabel(OpenedImageFile? file) {
-  final suitability = file?.metadata.paletteSuitability;
+String? _paletteSuggestionLabel(PaletteSuitability? suitability) {
   if (suitability == null) {
     return null;
   }
@@ -81,8 +80,7 @@ String? _paletteSuggestionLabel(OpenedImageFile? file) {
   };
 }
 
-String? _paletteSuggestionTooltip(OpenedImageFile? file) {
-  final suitability = file?.metadata.paletteSuitability;
+String? _paletteSuggestionTooltip(PaletteSuitability? suitability) {
   if (suitability == null) {
     return null;
   }

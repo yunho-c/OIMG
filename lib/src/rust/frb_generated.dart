@@ -1058,6 +1058,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool dco_decode_box_autoadd_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
+  }
+
+  @protected
   ConvertOptions dco_decode_box_autoadd_convert_options(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_convert_options(raw);
@@ -1332,17 +1338,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ImageMetadata dco_decode_image_metadata(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return ImageMetadata(
       width: dco_decode_u_32(arr[0]),
       height: dco_decode_u_32(arr[1]),
       format: dco_decode_String(arr[2]),
       fileSize: dco_decode_opt_box_autoadd_u_64(arr[3]),
-      hasTransparency: dco_decode_bool(arr[4]),
-      paletteSuitability: dco_decode_opt_box_autoadd_palette_suitability(
-        arr[5],
-      ),
+      hasTransparency: dco_decode_opt_box_autoadd_bool(arr[4]),
     );
   }
 
@@ -1421,6 +1424,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  bool? dco_decode_opt_box_autoadd_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_bool(raw);
   }
 
   @protected
@@ -1554,8 +1563,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PreviewResult dco_decode_preview_result(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return PreviewResult(
       encodedBytes: dco_decode_list_prim_u_8_strict(arr[0]),
       artifactId: dco_decode_String(arr[1]),
@@ -1563,6 +1572,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       width: dco_decode_u_32(arr[3]),
       height: dco_decode_u_32(arr[4]),
       sizeBytes: dco_decode_u_64(arr[5]),
+      sourceHasTransparency: dco_decode_bool(arr[6]),
+      paletteSuitability: dco_decode_opt_box_autoadd_palette_suitability(
+        arr[7],
+      ),
     );
   }
 
@@ -1941,6 +1954,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_bool(deserializer));
+  }
+
+  @protected
   ConvertOptions sse_decode_box_autoadd_convert_options(
     SseDeserializer deserializer,
   ) {
@@ -2264,17 +2283,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_height = sse_decode_u_32(deserializer);
     var var_format = sse_decode_String(deserializer);
     var var_fileSize = sse_decode_opt_box_autoadd_u_64(deserializer);
-    var var_hasTransparency = sse_decode_bool(deserializer);
-    var var_paletteSuitability = sse_decode_opt_box_autoadd_palette_suitability(
-      deserializer,
-    );
+    var var_hasTransparency = sse_decode_opt_box_autoadd_bool(deserializer);
     return ImageMetadata(
       width: var_width,
       height: var_height,
       format: var_format,
       fileSize: var_fileSize,
       hasTransparency: var_hasTransparency,
-      paletteSuitability: var_paletteSuitability,
     );
   }
 
@@ -2390,6 +2405,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_bool(deserializer));
     } else {
       return null;
     }
@@ -2601,6 +2627,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_width = sse_decode_u_32(deserializer);
     var var_height = sse_decode_u_32(deserializer);
     var var_sizeBytes = sse_decode_u_64(deserializer);
+    var var_sourceHasTransparency = sse_decode_bool(deserializer);
+    var var_paletteSuitability = sse_decode_opt_box_autoadd_palette_suitability(
+      deserializer,
+    );
     return PreviewResult(
       encodedBytes: var_encodedBytes,
       artifactId: var_artifactId,
@@ -2608,6 +2638,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       width: var_width,
       height: var_height,
       sizeBytes: var_sizeBytes,
+      sourceHasTransparency: var_sourceHasTransparency,
+      paletteSuitability: var_paletteSuitability,
     );
   }
 
@@ -2979,6 +3011,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_convert_options(
     ConvertOptions self,
     SseSerializer serializer,
@@ -3274,11 +3312,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.height, serializer);
     sse_encode_String(self.format, serializer);
     sse_encode_opt_box_autoadd_u_64(self.fileSize, serializer);
-    sse_encode_bool(self.hasTransparency, serializer);
-    sse_encode_opt_box_autoadd_palette_suitability(
-      self.paletteSuitability,
-      serializer,
-    );
+    sse_encode_opt_box_autoadd_bool(self.hasTransparency, serializer);
   }
 
   @protected
@@ -3392,6 +3426,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_String(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_bool(self, serializer);
     }
   }
 
@@ -3587,6 +3631,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.width, serializer);
     sse_encode_u_32(self.height, serializer);
     sse_encode_u_64(self.sizeBytes, serializer);
+    sse_encode_bool(self.sourceHasTransparency, serializer);
+    sse_encode_opt_box_autoadd_palette_suitability(
+      self.paletteSuitability,
+      serializer,
+    );
   }
 
   @protected

@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -33,6 +34,8 @@ class ExplorerSelection {
 }
 
 class FileOpenController extends ChangeNotifier {
+  static const _maxConcurrentInspections = 8;
+
   FileOpenController({
     required FileOpenChannel channel,
     required SlimgApi slimg,
@@ -49,6 +52,7 @@ class FileOpenController extends ChangeNotifier {
   int _currentIndex = 0;
   String? _pendingNotice;
   String? _selectedFolderPath;
+  bool _isOpening = false;
 
   UnmodifiableListView<OpenedImageFile> get sessionFiles =>
       UnmodifiableListView(_sessionFiles);
@@ -56,6 +60,7 @@ class FileOpenController extends ChangeNotifier {
       UnmodifiableListView(_sessionFiles.map((file) => file.path).toList());
 
   bool get hasSession => _sessionFiles.isNotEmpty;
+  bool get isOpening => _isOpening;
   int get currentIndex => _currentIndex;
   int get sessionLength => _sessionFiles.length;
   bool get canGoPrevious => _currentIndex > 0;
@@ -168,34 +173,37 @@ class FileOpenController extends ChangeNotifier {
   }
 
   Future<void> openPaths(List<String> paths) async {
-    final candidatePaths = await _expandCandidatePaths(paths);
-    final inspectedFiles = <OpenedImageFile>[];
-    var rejectedCount = 0;
-
-    for (final path in candidatePaths) {
-      final file = await _inspectPath(path);
-      if (file == null) {
-        rejectedCount += 1;
-        continue;
-      }
-      inspectedFiles.add(file);
-    }
-
-    if (inspectedFiles.isEmpty) {
-      if (candidatePaths.isNotEmpty) {
-        _pendingNotice = 'Some files could not be opened.';
-        notifyListeners();
-      }
+    if (paths.isEmpty) {
       return;
     }
 
-    _sessionFiles = inspectedFiles;
-    _currentIndex = 0;
-    _selectedFolderPath = null;
-    _pendingNotice = rejectedCount == 0
-        ? null
-        : 'Some files could not be opened.';
+    _isOpening = true;
     notifyListeners();
+    try {
+      final candidatePaths = await _expandCandidatePaths(paths);
+      final inspectionResults = await _inspectCandidatePaths(candidatePaths);
+      final inspectedFiles = inspectionResults
+          .whereType<OpenedImageFile>()
+          .toList(growable: false);
+      final rejectedCount = inspectionResults.length - inspectedFiles.length;
+
+      if (inspectedFiles.isEmpty) {
+        if (candidatePaths.isNotEmpty) {
+          _pendingNotice = 'Some files could not be opened.';
+        }
+        return;
+      }
+
+      _sessionFiles = inspectedFiles;
+      _currentIndex = 0;
+      _selectedFolderPath = null;
+      _pendingNotice = rejectedCount == 0
+          ? null
+          : 'Some files could not be opened.';
+    } finally {
+      _isOpening = false;
+      notifyListeners();
+    }
   }
 
   void showPrevious() {
@@ -301,8 +309,7 @@ class FileOpenController extends ChangeNotifier {
           result,
           outputPath: item.inputPath,
         );
-        final refreshedFile = await _inspectPath(item.inputPath);
-        updatedFiles[index] = (refreshedFile ?? updatedFiles[index]).copyWith(
+        updatedFiles[index] = updatedFiles[index].copyWith(
           lastResult: effectiveResult,
           clearLastError: true,
         );
@@ -364,19 +371,6 @@ class FileOpenController extends ChangeNotifier {
         continue;
       }
 
-      final refreshedFile = await _inspectPath(result.outputPath);
-      if (refreshedFile == null) {
-        DeveloperDiagnostics.logTiming(
-          'optimize-results',
-          'reload-failed input=${item.inputPath} output=${result.outputPath} didWrite=${result.didWrite}',
-        );
-        updatedFiles[index] = updatedFiles[index].copyWith(
-          lastResult: result,
-          lastError: 'Unable to reload optimized file.',
-        );
-        continue;
-      }
-
       DeveloperDiagnostics.logTiming(
         'optimize-results',
         'applied input=${item.inputPath} output=${result.outputPath} didWrite=${result.didWrite} original=${result.originalSize} new=${result.newSize}',
@@ -393,9 +387,10 @@ class FileOpenController extends ChangeNotifier {
           // Best-effort cleanup; the optimized file has already been written.
         }
       }
-      updatedFiles[index] = refreshedFile.copyWith(
+      updatedFiles[index] = OpenedImageFile(
+        path: result.outputPath,
+        metadata: _metadataFromProcessResult(result),
         lastResult: result,
-        clearLastError: true,
       );
     }
 
@@ -421,6 +416,42 @@ class FileOpenController extends ChangeNotifier {
     } on Object {
       return null;
     }
+  }
+
+  Future<List<OpenedImageFile?>> _inspectCandidatePaths(
+    List<String> candidatePaths,
+  ) async {
+    if (candidatePaths.isEmpty) {
+      return const <OpenedImageFile?>[];
+    }
+
+    final results = List<OpenedImageFile?>.filled(candidatePaths.length, null);
+    var nextIndex = 0;
+
+    Future<void> inspectNext() async {
+      while (nextIndex < candidatePaths.length) {
+        final index = nextIndex;
+        nextIndex += 1;
+        results[index] = await _inspectPath(candidatePaths[index]);
+      }
+    }
+
+    final workerCount = math.min(
+      _maxConcurrentInspections,
+      candidatePaths.length,
+    );
+    await Future.wait(List.generate(workerCount, (_) => inspectNext()));
+    return results;
+  }
+
+  static ImageMetadata _metadataFromProcessResult(ProcessResult result) {
+    return ImageMetadata(
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      fileSize: result.newSize,
+      hasTransparency: null,
+    );
   }
 
   Future<String> _renameSourceFile({

@@ -49,6 +49,10 @@ class _ImageStageState extends ConsumerState<_ImageStage> {
     final optimizedDisplay = ref.watch(currentOptimizedDisplayProvider);
     final displayMode = ref.watch(currentPreviewDisplayModeProvider);
     final differenceFrame = ref.watch(currentPreviewDifferenceFrameProvider);
+    final sourceHasTransparency =
+        preview.asData?.value?.result.sourceHasTransparency ??
+        currentFile.metadata.hasTransparency ??
+        false;
     final hasOptimizedPreview = optimizedDisplay != null;
     final planData = plan.maybeWhen(data: (value) => value, orElse: () => null);
     final differenceUnavailableTooltip =
@@ -188,7 +192,7 @@ class _ImageStageState extends ConsumerState<_ImageStage> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (currentFile.metadata.hasTransparency) ...[
+                            if (sourceHasTransparency) ...[
                               Text(
                                 'transparent',
                                 style: TextStyle(

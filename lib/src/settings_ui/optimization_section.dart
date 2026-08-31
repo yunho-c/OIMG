@@ -21,7 +21,12 @@ class _OptimizationCollapsibleState
   @override
   Widget build(BuildContext context) {
     final notifier = ref.read(appSettingsProvider.notifier);
-    final currentFile = ref.watch(fileOpenControllerProvider).currentFile;
+    final paletteSuitability = ref
+        .watch(currentPreviewProvider)
+        .asData
+        ?.value
+        ?.result
+        .paletteSuitability;
 
     return SizedBox(
       width: double.infinity,
@@ -107,12 +112,14 @@ class _OptimizationCollapsibleState
                           children: [
                             const _SettingsLabel('Palette'),
                             const Spacer(),
-                            if (_paletteSuggestionLabel(currentFile)
+                            if (_paletteSuggestionLabel(paletteSuitability)
                                 case final suggestion?)
                               Tooltip(
                                 tooltip: (context) => TooltipContainer(
                                   child: Text(
-                                    _paletteSuggestionTooltip(currentFile)!,
+                                    _paletteSuggestionTooltip(
+                                      paletteSuitability,
+                                    )!,
                                   ),
                                 ),
                                 child: Text(suggestion).xSmall().muted(),

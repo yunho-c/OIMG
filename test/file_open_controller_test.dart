@@ -71,6 +71,33 @@ void main() {
       expect(controller.currentIndex, 0);
     });
 
+    test(
+      'inspects dropped files concurrently with a bounded worker count',
+      () async {
+        final paths = List.generate(20, (index) => 'image-$index.png');
+        final slimg = _FakeSlimgApi(
+          inspectResults: {for (final path in paths) path: _metadata('png')},
+          inspectDelay: const Duration(milliseconds: 20),
+        );
+        final controller = FileOpenController(
+          channel: _FakeFileOpenChannel(),
+          slimg: slimg,
+        );
+
+        final opening = controller.openPaths(paths);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(controller.isOpening, isTrue);
+
+        await opening;
+
+        expect(controller.isOpening, isFalse);
+        expect(controller.sessionPaths, paths);
+        expect(slimg.maxConcurrentInspections, greaterThan(1));
+        expect(slimg.maxConcurrentInspections, lessThanOrEqualTo(8));
+      },
+    );
+
     test('supports bounded multi-file navigation', () async {
       final controller = FileOpenController(
         channel: _FakeFileOpenChannel(),
@@ -283,6 +310,43 @@ void main() {
       },
     );
 
+    test('uses process metadata without reinspecting the output', () async {
+      final slimg = _FakeSlimgApi(
+        inspectResults: {'/tmp/source.png': _metadata('png')},
+      );
+      final controller = FileOpenController(
+        channel: _FakeFileOpenChannel(),
+        slimg: slimg,
+        initialPaths: const ['/tmp/source.png'],
+      );
+
+      await controller.initialize();
+      expect(slimg.inspectCallCount, 1);
+
+      await controller.applyProcessResults([
+        BatchItemResult(
+          inputPath: '/tmp/source.png',
+          success: true,
+          result: ProcessResult(
+            outputPath: '/tmp/output.webp',
+            format: 'webp',
+            width: 640,
+            height: 480,
+            originalSize: BigInt.from(2400),
+            newSize: BigInt.from(900),
+            didWrite: true,
+          ),
+        ),
+      ]);
+
+      expect(slimg.inspectCallCount, 1);
+      expect(controller.currentPath, '/tmp/output.webp');
+      expect(controller.currentFile?.metadata.format, 'webp');
+      expect(controller.currentFile?.metadata.width, 640);
+      expect(controller.currentFile?.metadata.height, 480);
+      expect(controller.currentFile?.metadata.fileSize, BigInt.from(900));
+    });
+
     test(
       'renames the original after a successful keep-original conversion',
       () async {
@@ -487,20 +551,39 @@ class _FakeFileOpenChannel implements FileOpenChannel {
 }
 
 class _FakeSlimgApi implements SlimgApi {
-  _FakeSlimgApi({required this.inspectResults});
+  _FakeSlimgApi({
+    required this.inspectResults,
+    this.inspectDelay = Duration.zero,
+  });
 
   final Map<String, ImageMetadata> inspectResults;
+  final Duration inspectDelay;
+  int inspectCallCount = 0;
+  int activeInspections = 0;
+  int maxConcurrentInspections = 0;
 
   @override
   void setTimingLogsEnabled({required bool enabled}) {}
 
   @override
   Future<ImageMetadata> inspectFile({required String inputPath}) async {
-    final value = inspectResults[inputPath];
-    if (value == null) {
-      throw StateError('unsupported');
+    inspectCallCount += 1;
+    activeInspections += 1;
+    if (activeInspections > maxConcurrentInspections) {
+      maxConcurrentInspections = activeInspections;
     }
-    return value;
+    try {
+      if (inspectDelay > Duration.zero) {
+        await Future<void>.delayed(inspectDelay);
+      }
+      final value = inspectResults[inputPath];
+      if (value == null) {
+        throw StateError('unsupported');
+      }
+      return value;
+    } finally {
+      activeInspections -= 1;
+    }
   }
 
   @override
@@ -514,6 +597,7 @@ class _FakeSlimgApi implements SlimgApi {
       width: 48,
       height: 32,
       sizeBytes: BigInt.from(512),
+      sourceHasTransparency: false,
     );
   }
 

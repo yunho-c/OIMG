@@ -1252,16 +1252,13 @@ impl SseDecode for crate::types::ImageMetadata {
         let mut var_height = <u32>::sse_decode(deserializer);
         let mut var_format = <String>::sse_decode(deserializer);
         let mut var_fileSize = <Option<u64>>::sse_decode(deserializer);
-        let mut var_hasTransparency = <bool>::sse_decode(deserializer);
-        let mut var_paletteSuitability =
-            <Option<crate::types::PaletteSuitability>>::sse_decode(deserializer);
+        let mut var_hasTransparency = <Option<bool>>::sse_decode(deserializer);
         return crate::types::ImageMetadata {
             width: var_width,
             height: var_height,
             format: var_format,
             file_size: var_fileSize,
             has_transparency: var_hasTransparency,
-            palette_suitability: var_paletteSuitability,
         };
     }
 }
@@ -1377,6 +1374,17 @@ impl SseDecode for Option<String> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<bool>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -1587,6 +1595,9 @@ impl SseDecode for crate::types::PreviewResult {
         let mut var_width = <u32>::sse_decode(deserializer);
         let mut var_height = <u32>::sse_decode(deserializer);
         let mut var_sizeBytes = <u64>::sse_decode(deserializer);
+        let mut var_sourceHasTransparency = <bool>::sse_decode(deserializer);
+        let mut var_paletteSuitability =
+            <Option<crate::types::PaletteSuitability>>::sse_decode(deserializer);
         return crate::types::PreviewResult {
             encoded_bytes: var_encodedBytes,
             artifact_id: var_artifactId,
@@ -1594,6 +1605,8 @@ impl SseDecode for crate::types::PreviewResult {
             width: var_width,
             height: var_height,
             size_bytes: var_sizeBytes,
+            source_has_transparency: var_sourceHasTransparency,
+            palette_suitability: var_paletteSuitability,
         };
     }
 }
@@ -2366,7 +2379,6 @@ impl flutter_rust_bridge::IntoDart for crate::types::ImageMetadata {
             self.format.into_into_dart().into_dart(),
             self.file_size.into_into_dart().into_dart(),
             self.has_transparency.into_into_dart().into_dart(),
-            self.palette_suitability.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2547,6 +2559,8 @@ impl flutter_rust_bridge::IntoDart for crate::types::PreviewResult {
             self.width.into_into_dart().into_dart(),
             self.height.into_into_dart().into_dart(),
             self.size_bytes.into_into_dart().into_dart(),
+            self.source_has_transparency.into_into_dart().into_dart(),
+            self.palette_suitability.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -3082,11 +3096,7 @@ impl SseEncode for crate::types::ImageMetadata {
         <u32>::sse_encode(self.height, serializer);
         <String>::sse_encode(self.format, serializer);
         <Option<u64>>::sse_encode(self.file_size, serializer);
-        <bool>::sse_encode(self.has_transparency, serializer);
-        <Option<crate::types::PaletteSuitability>>::sse_encode(
-            self.palette_suitability,
-            serializer,
-        );
+        <Option<bool>>::sse_encode(self.has_transparency, serializer);
     }
 }
 
@@ -3187,6 +3197,16 @@ impl SseEncode for Option<String> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <bool>::sse_encode(value, serializer);
         }
     }
 }
@@ -3370,6 +3390,11 @@ impl SseEncode for crate::types::PreviewResult {
         <u32>::sse_encode(self.width, serializer);
         <u32>::sse_encode(self.height, serializer);
         <u64>::sse_encode(self.size_bytes, serializer);
+        <bool>::sse_encode(self.source_has_transparency, serializer);
+        <Option<crate::types::PaletteSuitability>>::sse_encode(
+            self.palette_suitability,
+            serializer,
+        );
     }
 }
 

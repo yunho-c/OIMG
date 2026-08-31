@@ -2,9 +2,9 @@ part of 'package:oimg/main.dart';
 
 String? _transparencyWarningText({
   required AppSettings settings,
-  required OpenedImageFile? file,
+  required bool hasTransparency,
 }) {
-  if (file == null || !file.metadata.hasTransparency) {
+  if (!hasTransparency) {
     return null;
   }
 

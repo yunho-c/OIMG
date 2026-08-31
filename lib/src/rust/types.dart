@@ -486,16 +486,14 @@ class ImageMetadata {
   final int height;
   final String format;
   final BigInt? fileSize;
-  final bool hasTransparency;
-  final PaletteSuitability? paletteSuitability;
+  final bool? hasTransparency;
 
   const ImageMetadata({
     required this.width,
     required this.height,
     required this.format,
     this.fileSize,
-    required this.hasTransparency,
-    this.paletteSuitability,
+    this.hasTransparency,
   });
 
   @override
@@ -504,8 +502,7 @@ class ImageMetadata {
       height.hashCode ^
       format.hashCode ^
       fileSize.hashCode ^
-      hasTransparency.hashCode ^
-      paletteSuitability.hashCode;
+      hasTransparency.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -516,8 +513,7 @@ class ImageMetadata {
           height == other.height &&
           format == other.format &&
           fileSize == other.fileSize &&
-          hasTransparency == other.hasTransparency &&
-          paletteSuitability == other.paletteSuitability;
+          hasTransparency == other.hasTransparency;
 }
 
 @freezed
@@ -646,6 +642,8 @@ class PreviewResult {
   final int width;
   final int height;
   final BigInt sizeBytes;
+  final bool sourceHasTransparency;
+  final PaletteSuitability? paletteSuitability;
 
   const PreviewResult({
     required this.encodedBytes,
@@ -654,6 +652,8 @@ class PreviewResult {
     required this.width,
     required this.height,
     required this.sizeBytes,
+    required this.sourceHasTransparency,
+    this.paletteSuitability,
   });
 
   @override
@@ -663,7 +663,9 @@ class PreviewResult {
       format.hashCode ^
       width.hashCode ^
       height.hashCode ^
-      sizeBytes.hashCode;
+      sizeBytes.hashCode ^
+      sourceHasTransparency.hashCode ^
+      paletteSuitability.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -675,7 +677,9 @@ class PreviewResult {
           format == other.format &&
           width == other.width &&
           height == other.height &&
-          sizeBytes == other.sizeBytes;
+          sizeBytes == other.sizeBytes &&
+          sourceHasTransparency == other.sourceHasTransparency &&
+          paletteSuitability == other.paletteSuitability;
 }
 
 class ProcessBytesRequest {
