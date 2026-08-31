@@ -97,22 +97,40 @@ void main() {
     expect(didStart, isTrue);
   });
 
-  test('ensureWritableDirectoryAccess forwards directory paths', () async {
+  test('ensureWritableDirectoryAccess forwards and parses bookmarks', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           expect(call.method, 'ensureWritableDirectoryAccess');
-          expect(call.arguments, ['/tmp/images', '/tmp/archive']);
-          return true;
+          expect(call.arguments, {
+            'paths': ['/tmp/images', '/tmp/archive'],
+            'accesses': [
+              {'path': '/tmp/old', 'bookmark': 'old-bookmark'},
+            ],
+          });
+          return <String, Object>{
+            'didStartAccess': true,
+            'accesses': <Object>[
+              <String, String>{
+                'path': '/tmp/images',
+                'bookmark': 'new-bookmark',
+              },
+            ],
+          };
         });
 
     final fileOpenChannel = MethodChannelFileOpenChannel(channel: channel);
 
-    final didStart = await fileOpenChannel.ensureWritableDirectoryAccess(const [
-      '/tmp/images',
-      '/tmp/archive',
-    ]);
+    final result = await fileOpenChannel.ensureWritableDirectoryAccess(
+      const ['/tmp/images', '/tmp/archive'],
+      persistentAccesses: const [
+        SecurityScopedFileAccess(path: '/tmp/old', bookmark: 'old-bookmark'),
+      ],
+    );
 
-    expect(didStart, isTrue);
+    expect(result.didStartAccess, isTrue);
+    expect(result.persistentAccesses, hasLength(1));
+    expect(result.persistentAccesses.single.path, '/tmp/images');
+    expect(result.persistentAccesses.single.bookmark, 'new-bookmark');
   });
 
   test(
@@ -120,11 +138,18 @@ void main() {
     () async {
       final fileOpenChannel = MethodChannelFileOpenChannel(channel: channel);
 
-      final didStart = await fileOpenChannel.ensureWritableDirectoryAccess(
+      final result = await fileOpenChannel.ensureWritableDirectoryAccess(
         const ['/tmp/images'],
+        persistentAccesses: const [
+          SecurityScopedFileAccess(
+            path: '/tmp/images',
+            bookmark: 'bookmark-data',
+          ),
+        ],
       );
 
-      expect(didStart, isTrue);
+      expect(result.didStartAccess, isTrue);
+      expect(result.persistentAccesses.single.bookmark, 'bookmark-data');
     },
   );
 }

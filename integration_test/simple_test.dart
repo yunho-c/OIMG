@@ -65,8 +65,15 @@ class _NoopFileOpenChannel implements FileOpenChannel {
   }
 
   @override
-  Future<bool> ensureWritableDirectoryAccess(List<String> paths) async {
-    return true;
+  Future<WritableDirectoryAccessResult> ensureWritableDirectoryAccess(
+    List<String> paths, {
+    List<SecurityScopedFileAccess> persistentAccesses =
+        const <SecurityScopedFileAccess>[],
+  }) async {
+    return WritableDirectoryAccessResult(
+      didStartAccess: true,
+      persistentAccesses: persistentAccesses,
+    );
   }
 
   @override

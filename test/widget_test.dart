@@ -3488,8 +3488,25 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(1400, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
+      final store = _FakeAppSettingsStore()
+        ..value = AppSettings.defaults
+            .copyWith(
+              sameFolderAccesses: const [
+                StoredDirectoryAccess(
+                  path: '/tmp/old',
+                  bookmark: 'old-bookmark',
+                ),
+              ],
+            )
+            .toJsonString();
       final channel = _FakeFileOpenChannel()
-        ..writableDirectoryAccessResult = false;
+        ..writableDirectoryAccessResult = false
+        ..writablePersistentAccessesResult = const [
+          SecurityScopedFileAccess(
+            path: '/tmp/refreshed',
+            bookmark: 'refreshed-bookmark',
+          ),
+        ];
       final slimg = _FakeSlimgApi(
         inspectResults: {'/tmp/first.png': _metadata('png', 2400)},
       );
@@ -3500,7 +3517,9 @@ void main() {
       );
       await controller.initialize();
 
-      await tester.pumpWidget(_buildApp(controller: controller, slimg: slimg));
+      await tester.pumpWidget(
+        _buildApp(controller: controller, slimg: slimg, store: store),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
@@ -3508,6 +3527,20 @@ void main() {
       await tester.pump();
 
       expect(channel.lastWritableDirectoryPaths, ['/tmp']);
+      expect(channel.lastWritablePersistentAccesses, hasLength(1));
+      expect(
+        channel.lastWritablePersistentAccesses!.single.bookmark,
+        'old-bookmark',
+      );
+      final persistedSettings = AppSettings.fromJsonString(
+        (await store.read())!,
+      );
+      expect(persistedSettings.sameFolderAccesses, const [
+        StoredDirectoryAccess(
+          path: '/tmp/refreshed',
+          bookmark: 'refreshed-bookmark',
+        ),
+      ]);
       expect(slimg.lastBatchRequest, isNull);
       expect(find.text('Choose the save folder to continue.'), findsOneWidget);
       expect(find.text('Success!'), findsNothing);
@@ -4966,7 +4999,9 @@ class _FakeFileOpenChannel implements FileOpenChannel {
   int pickFolderCallCount = 0;
   String? lastStartedSecurityScopedBookmark;
   List<String>? lastWritableDirectoryPaths;
+  List<SecurityScopedFileAccess>? lastWritablePersistentAccesses;
   bool writableDirectoryAccessResult = true;
+  List<SecurityScopedFileAccess>? writablePersistentAccessesResult;
 
   @override
   Future<void> bind(OpenFilesHandler onOpenFiles) async {
@@ -5005,9 +5040,18 @@ class _FakeFileOpenChannel implements FileOpenChannel {
   }
 
   @override
-  Future<bool> ensureWritableDirectoryAccess(List<String> paths) async {
+  Future<WritableDirectoryAccessResult> ensureWritableDirectoryAccess(
+    List<String> paths, {
+    List<SecurityScopedFileAccess> persistentAccesses =
+        const <SecurityScopedFileAccess>[],
+  }) async {
     lastWritableDirectoryPaths = paths;
-    return writableDirectoryAccessResult;
+    lastWritablePersistentAccesses = persistentAccesses;
+    return WritableDirectoryAccessResult(
+      didStartAccess: writableDirectoryAccessResult,
+      persistentAccesses:
+          writablePersistentAccessesResult ?? persistentAccesses,
+    );
   }
 
   @override

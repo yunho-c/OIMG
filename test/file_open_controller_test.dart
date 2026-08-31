@@ -19,15 +19,27 @@ void main() {
           slimg: _FakeSlimgApi(inspectResults: const {}),
         );
 
-        final didStart = await controller
-            .ensureWritableContainingDirectoryAccess(const [
-              '/tmp/images/first.png',
-              '/tmp/images/second.png',
-              '/tmp/archive/third.png',
-            ]);
+        final result = await controller.ensureWritableContainingDirectoryAccess(
+          const [
+            '/tmp/images/first.png',
+            '/tmp/images/second.png',
+            '/tmp/archive/third.png',
+          ],
+          persistentAccesses: const [
+            SecurityScopedFileAccess(
+              path: '/tmp/images',
+              bookmark: 'bookmark-data',
+            ),
+          ],
+        );
 
-        expect(didStart, isTrue);
+        expect(result.didStartAccess, isTrue);
         expect(channel.writableDirectoryPaths, ['/tmp/images', '/tmp/archive']);
+        expect(channel.writablePersistentAccesses, hasLength(1));
+        expect(
+          channel.writablePersistentAccesses!.single.bookmark,
+          'bookmark-data',
+        );
       },
     );
 
@@ -542,6 +554,7 @@ ImageMetadata _metadata(String format) {
 class _FakeFileOpenChannel implements FileOpenChannel {
   final List<String> shownPaths = <String>[];
   List<String>? writableDirectoryPaths;
+  List<SecurityScopedFileAccess>? writablePersistentAccesses;
 
   @override
   Future<void> bind(OpenFilesHandler onOpenFiles) async {}
@@ -567,9 +580,17 @@ class _FakeFileOpenChannel implements FileOpenChannel {
   }
 
   @override
-  Future<bool> ensureWritableDirectoryAccess(List<String> paths) async {
+  Future<WritableDirectoryAccessResult> ensureWritableDirectoryAccess(
+    List<String> paths, {
+    List<SecurityScopedFileAccess> persistentAccesses =
+        const <SecurityScopedFileAccess>[],
+  }) async {
     writableDirectoryPaths = paths;
-    return true;
+    writablePersistentAccesses = persistentAccesses;
+    return WritableDirectoryAccessResult(
+      didStartAccess: true,
+      persistentAccesses: persistentAccesses,
+    );
   }
 
   @override

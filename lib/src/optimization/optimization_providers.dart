@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:oimg/src/file_open/file_open_channel.dart';
 import 'package:oimg/src/file_open/file_open_providers.dart';
 import 'package:oimg/src/file_open/opened_image_file.dart';
 import 'package:oimg/src/rust/slimg_api.dart';
@@ -1672,11 +1673,35 @@ class OptimizationRunController extends Notifier<OptimizationRunState> {
     final fileController = ref.read(fileOpenControllerProvider);
     final settings = await ref.read(appSettingsProvider.future);
     if (settings.storageDestinationMode == StorageDestinationMode.sameFolder) {
-      final didStartAccess = await fileController
+      final accessResult = await fileController
           .ensureWritableContainingDirectoryAccess(
             files.map((file) => file.path),
+            persistentAccesses: settings.sameFolderAccesses
+                .map(
+                  (access) => SecurityScopedFileAccess(
+                    path: access.path,
+                    bookmark: access.bookmark,
+                  ),
+                )
+                .toList(growable: false),
           );
-      if (!didStartAccess) {
+      final updatedAccesses = accessResult.persistentAccesses
+          .where(
+            (access) => access.bookmark != null && access.bookmark!.isNotEmpty,
+          )
+          .map(
+            (access) => StoredDirectoryAccess(
+              path: access.path,
+              bookmark: access.bookmark!,
+            ),
+          )
+          .toList(growable: false);
+      if (settings.copyWith(sameFolderAccesses: updatedAccesses) != settings) {
+        await ref
+            .read(appSettingsProvider.notifier)
+            .setSameFolderAccesses(updatedAccesses);
+      }
+      if (!accessResult.didStartAccess) {
         state = _idleState(
           items: state.items,
           globalError: 'Choose the save folder to continue.',

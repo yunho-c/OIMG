@@ -7,6 +7,36 @@ void main() {
     expect(AppSettings.defaults.differenceTooltipUsesSwatches, isTrue);
   });
 
+  test('round-trips persisted same-folder directory access', () {
+    final settings = AppSettings.defaults.copyWith(
+      sameFolderAccesses: const [
+        StoredDirectoryAccess(path: '/tmp/images', bookmark: 'bookmark-one'),
+        StoredDirectoryAccess(path: '/tmp/archive', bookmark: 'bookmark-two'),
+      ],
+    );
+
+    final restored = AppSettings.fromJsonString(settings.toJsonString());
+
+    expect(restored, settings);
+    expect(restored.sameFolderAccesses, hasLength(2));
+  });
+
+  test('ignores malformed persisted directory access entries', () {
+    final json = AppSettings.defaults.toJson()
+      ..['sameFolderAccesses'] = <Object>[
+        <String, String>{'path': '/tmp/images', 'bookmark': 'bookmark'},
+        <String, String>{'path': '', 'bookmark': 'missing-path'},
+        <String, String>{'path': '/tmp/archive', 'bookmark': ''},
+        'invalid',
+      ];
+
+    final restored = AppSettings.fromJson(json);
+
+    expect(restored.sameFolderAccesses, const [
+      StoredDirectoryAccess(path: '/tmp/images', bookmark: 'bookmark'),
+    ]);
+  });
+
   group('AppSettings.effectiveCodec', () {
     test('uses intuitive mapping when advanced mode is off', () {
       expect(
@@ -251,6 +281,7 @@ void main() {
       expect(settings.keepSourceOptimizedSuffix, '_optimized');
       expect(settings.differentLocationPath, isNull);
       expect(settings.differentLocationBookmark, isNull);
+      expect(settings.sameFolderAccesses, isEmpty);
       expect(settings.preserveFolderStructure, isTrue);
       expect(settings.preserveOriginalDate, isFalse);
       expect(settings.preserveExif, isFalse);

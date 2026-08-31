@@ -81,6 +81,12 @@ void main() {
         path: '/tmp/export',
         bookmark: 'bookmark-data',
       );
+      await notifier.setSameFolderAccesses(const [
+        StoredDirectoryAccess(
+          path: '/tmp/images',
+          bookmark: 'same-folder-bookmark',
+        ),
+      ]);
       await notifier.setPreserveFolderStructure(false);
       await notifier.setPreserveOriginalDate(true);
       await notifier.setPreserveExif(true);
@@ -120,6 +126,12 @@ void main() {
           keepSourceOptimizedSuffix: '_small',
           differentLocationPath: '/tmp/export',
           differentLocationBookmark: 'bookmark-data',
+          sameFolderAccesses: [
+            StoredDirectoryAccess(
+              path: '/tmp/images',
+              bookmark: 'same-folder-bookmark',
+            ),
+          ],
           preserveFolderStructure: false,
           preserveOriginalDate: true,
           preserveExif: true,

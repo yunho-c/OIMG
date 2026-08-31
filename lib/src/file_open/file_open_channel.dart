@@ -11,6 +11,16 @@ class SecurityScopedFileAccess {
   final String? bookmark;
 }
 
+class WritableDirectoryAccessResult {
+  const WritableDirectoryAccessResult({
+    required this.didStartAccess,
+    this.persistentAccesses = const <SecurityScopedFileAccess>[],
+  });
+
+  final bool didStartAccess;
+  final List<SecurityScopedFileAccess> persistentAccesses;
+}
+
 abstract class FileOpenChannel {
   Future<void> bind(OpenFilesHandler onOpenFiles);
   Future<List<String>> pickFiles();
@@ -28,7 +38,11 @@ abstract class FileOpenChannel {
     return false;
   }
 
-  Future<bool> ensureWritableDirectoryAccess(List<String> paths);
+  Future<WritableDirectoryAccessResult> ensureWritableDirectoryAccess(
+    List<String> paths, {
+    List<SecurityScopedFileAccess> persistentAccesses =
+        const <SecurityScopedFileAccess>[],
+  });
 
   Future<void> showInFileManager(String path);
 }
@@ -141,18 +155,59 @@ class MethodChannelFileOpenChannel implements FileOpenChannel {
   }
 
   @override
-  Future<bool> ensureWritableDirectoryAccess(List<String> paths) async {
+  Future<WritableDirectoryAccessResult> ensureWritableDirectoryAccess(
+    List<String> paths, {
+    List<SecurityScopedFileAccess> persistentAccesses =
+        const <SecurityScopedFileAccess>[],
+  }) async {
     if (paths.isEmpty) {
-      return true;
+      return WritableDirectoryAccessResult(
+        didStartAccess: true,
+        persistentAccesses: persistentAccesses,
+      );
     }
     try {
-      final result = await _channel.invokeMethod<bool>(
+      final result = await _channel.invokeMethod<Object?>(
         'ensureWritableDirectoryAccess',
-        paths,
+        <String, Object>{
+          'paths': paths,
+          'accesses': persistentAccesses
+              .where(
+                (access) =>
+                    access.bookmark != null && access.bookmark!.isNotEmpty,
+              )
+              .map(
+                (access) => <String, String>{
+                  'path': access.path,
+                  'bookmark': access.bookmark!,
+                },
+              )
+              .toList(growable: false),
+        },
       );
-      return result ?? false;
+      if (result is bool) {
+        return WritableDirectoryAccessResult(
+          didStartAccess: result,
+          persistentAccesses: persistentAccesses,
+        );
+      }
+      if (result is Map) {
+        final accesses = (result['accesses'] as List<Object?>? ?? const [])
+            .whereType<Map>()
+            .map(_parseSecurityScopedFileAccess)
+            .whereType<SecurityScopedFileAccess>()
+            .toList(growable: false);
+        return WritableDirectoryAccessResult(
+          didStartAccess: result['didStartAccess'] == true,
+          persistentAccesses: accesses,
+        );
+      }
+      return const WritableDirectoryAccessResult(didStartAccess: false);
     } on MissingPluginException {
-      return true;
+      return WritableDirectoryAccessResult(
+        didStartAccess: true,
+        persistentAccesses: persistentAccesses,
+      );
     }
   }
 
@@ -170,5 +225,17 @@ class MethodChannelFileOpenChannel implements FileOpenChannel {
       return const <String>[];
     }
     return paths.whereType<String>().toList(growable: false);
+  }
+
+  SecurityScopedFileAccess? _parseSecurityScopedFileAccess(Map value) {
+    final path = value['path'];
+    final bookmark = value['bookmark'];
+    if (path is! String ||
+        path.isEmpty ||
+        bookmark is! String ||
+        bookmark.isEmpty) {
+      return null;
+    }
+    return SecurityScopedFileAccess(path: path, bookmark: bookmark);
   }
 }

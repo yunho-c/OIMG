@@ -119,6 +119,16 @@ class AppSettingsController extends AsyncNotifier<AppSettings> {
     );
   }
 
+  Future<void> setSameFolderAccesses(
+    List<StoredDirectoryAccess> accesses,
+  ) async {
+    await _update(
+      (settings) => settings.copyWith(
+        sameFolderAccesses: List<StoredDirectoryAccess>.unmodifiable(accesses),
+      ),
+    );
+  }
+
   Future<void> setPreserveFolderStructure(bool preserveFolderStructure) async {
     await _update(
       (settings) =>

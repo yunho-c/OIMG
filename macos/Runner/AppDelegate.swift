@@ -2,6 +2,15 @@ import Cocoa
 import FlutterMacOS
 import UniformTypeIdentifiers
 
+private struct PersistedDirectoryAccess {
+  let path: String
+  let bookmark: String
+
+  var dictionary: [String: String] {
+    ["path": path, "bookmark": bookmark]
+  }
+}
+
 @main
 class AppDelegate: FlutterAppDelegate {
   private let fileOpenChannelName = "oimg/file_open"
@@ -57,11 +66,20 @@ class AppDelegate: FlutterAppDelegate {
         }
         result(self.startAccessingSecurityScopedResource(bookmark: bookmark))
       } else if call.method == "ensureWritableDirectoryAccess" {
-        guard let paths = call.arguments as? [String] else {
+        guard let arguments = call.arguments as? [String: Any],
+              let paths = arguments["paths"] as? [String]
+        else {
           result(false)
           return
         }
-        result(self.ensureWritableDirectoryAccess(paths: paths))
+        let accesses = arguments["accesses"] as? [[String: Any]] ?? []
+        let bookmarks = accesses.compactMap { $0["bookmark"] as? String }
+        result(
+          self.ensureWritableDirectoryAccess(
+            paths: paths,
+            persistedBookmarks: bookmarks
+          )
+        )
       } else if call.method == "showInFileManager" {
         if let path = call.arguments as? String {
           self.showInFileManager(path: path)
@@ -144,16 +162,16 @@ class AppDelegate: FlutterAppDelegate {
 
   private func retainSecurityScopedAccess(for urls: [URL]) {
     for selectedUrl in urls where selectedUrl.isFileURL {
-      let url = canonicalFileUrl(selectedUrl)
-      let path = url.path
+      let canonicalUrl = canonicalFileUrl(selectedUrl)
+      let path = canonicalUrl.path
       if securityScopedUrlsByPath[path] != nil {
         continue
       }
 
-      if url.startAccessingSecurityScopedResource() {
-        securityScopedUrlsByPath[path] = url
-        if isDirectory(url) {
-          securityScopedDirectoryUrlsByPath[path] = url
+      if selectedUrl.startAccessingSecurityScopedResource() {
+        securityScopedUrlsByPath[path] = selectedUrl
+        if isDirectory(canonicalUrl) {
+          securityScopedDirectoryUrlsByPath[path] = selectedUrl
         }
       }
     }
@@ -172,14 +190,17 @@ class AppDelegate: FlutterAppDelegate {
         relativeTo: nil,
         bookmarkDataIsStale: &isStale
       )
+      let canonicalUrl = canonicalFileUrl(url)
+      if securityScopedUrlsByPath[canonicalUrl.path] != nil {
+        return true
+      }
       guard url.startAccessingSecurityScopedResource() else {
         return false
       }
 
-      let canonicalUrl = canonicalFileUrl(url)
-      securityScopedUrlsByPath[canonicalUrl.path] = canonicalUrl
+      securityScopedUrlsByPath[canonicalUrl.path] = url
       if isDirectory(canonicalUrl) {
-        securityScopedDirectoryUrlsByPath[canonicalUrl.path] = canonicalUrl
+        securityScopedDirectoryUrlsByPath[canonicalUrl.path] = url
       }
       return true
     } catch {
@@ -187,7 +208,11 @@ class AppDelegate: FlutterAppDelegate {
     }
   }
 
-  private func ensureWritableDirectoryAccess(paths: [String]) -> Bool {
+  private func ensureWritableDirectoryAccess(
+    paths: [String],
+    persistedBookmarks: [String]
+  ) -> [String: Any] {
+    var persistedAccesses = restoreDirectoryAccess(bookmarks: persistedBookmarks)
     var seenPaths = Set<String>()
     let directoryUrls = paths
       .filter { !$0.isEmpty }
@@ -196,6 +221,10 @@ class AppDelegate: FlutterAppDelegate {
 
     for directoryUrl in directoryUrls {
       if hasSecurityScopedDirectoryAccess(to: directoryUrl) {
+        addCoveringDirectoryAccess(
+          for: directoryUrl,
+          to: &persistedAccesses
+        )
         continue
       }
 
@@ -215,26 +244,117 @@ class AppDelegate: FlutterAppDelegate {
             let selectedUrl = panel.urls.first,
             selectedUrl.isFileURL
       else {
-        return false
+        return writableDirectoryAccessResult(
+          didStartAccess: false,
+          accesses: persistedAccesses
+        )
       }
 
       retainSecurityScopedAccess(for: [selectedUrl])
       guard hasSecurityScopedDirectoryAccess(to: directoryUrl) else {
-        return false
+        return writableDirectoryAccessResult(
+          didStartAccess: false,
+          accesses: persistedAccesses
+        )
       }
+      addCoveringDirectoryAccess(for: directoryUrl, to: &persistedAccesses)
     }
 
-    return true
+    return writableDirectoryAccessResult(
+      didStartAccess: true,
+      accesses: persistedAccesses
+    )
   }
 
   private func hasSecurityScopedDirectoryAccess(to directoryUrl: URL) -> Bool {
+    coveringSecurityScopedDirectory(for: directoryUrl) != nil
+  }
+
+  private func coveringSecurityScopedDirectory(
+    for directoryUrl: URL
+  ) -> (path: String, url: URL)? {
     let directoryPath = canonicalFileUrl(directoryUrl).path
-    return securityScopedDirectoryUrlsByPath.keys.contains { scopedPath in
-      if scopedPath == "/" || directoryPath == scopedPath {
-        return true
+    return securityScopedDirectoryUrlsByPath
+      .filter { entry in
+        let scopedPath = entry.key
+        return scopedPath == "/"
+          || directoryPath == scopedPath
+          || directoryPath.hasPrefix(scopedPath + "/")
       }
-      return directoryPath.hasPrefix(scopedPath + "/")
+      .max { first, second in first.key.count < second.key.count }
+      .map { (path: $0.key, url: $0.value) }
+  }
+
+  private func restoreDirectoryAccess(
+    bookmarks: [String]
+  ) -> [String: PersistedDirectoryAccess] {
+    var accesses: [String: PersistedDirectoryAccess] = [:]
+    for bookmark in bookmarks where !bookmark.isEmpty {
+      guard let data = Data(base64Encoded: bookmark) else {
+        continue
+      }
+
+      var isStale = false
+      do {
+        let url = try URL(
+          resolvingBookmarkData: data,
+          options: [.withSecurityScope],
+          relativeTo: nil,
+          bookmarkDataIsStale: &isStale
+        )
+        let canonicalUrl = canonicalFileUrl(url)
+        guard isDirectory(canonicalUrl) else {
+          continue
+        }
+
+        if securityScopedDirectoryUrlsByPath[canonicalUrl.path] == nil {
+          guard url.startAccessingSecurityScopedResource() else {
+            continue
+          }
+          securityScopedUrlsByPath[canonicalUrl.path] = url
+          securityScopedDirectoryUrlsByPath[canonicalUrl.path] = url
+        }
+
+        let currentBookmark = isStale
+          ? securityScopedBookmarkString(for: url) ?? bookmark
+          : bookmark
+        accesses[canonicalUrl.path] = PersistedDirectoryAccess(
+          path: canonicalUrl.path,
+          bookmark: currentBookmark
+        )
+      } catch {
+        continue
+      }
     }
+    return accesses
+  }
+
+  private func addCoveringDirectoryAccess(
+    for directoryUrl: URL,
+    to accesses: inout [String: PersistedDirectoryAccess]
+  ) {
+    guard let coveringAccess = coveringSecurityScopedDirectory(for: directoryUrl),
+          accesses[coveringAccess.path] == nil,
+          let bookmark = securityScopedBookmarkString(for: coveringAccess.url)
+    else {
+      return
+    }
+    accesses[coveringAccess.path] = PersistedDirectoryAccess(
+      path: coveringAccess.path,
+      bookmark: bookmark
+    )
+  }
+
+  private func writableDirectoryAccessResult(
+    didStartAccess: Bool,
+    accesses: [String: PersistedDirectoryAccess]
+  ) -> [String: Any] {
+    [
+      "didStartAccess": didStartAccess,
+      "accesses": accesses.values
+        .sorted { $0.path < $1.path }
+        .map(\.dictionary),
+    ]
   }
 
   private func canonicalFileUrl(_ url: URL) -> URL {

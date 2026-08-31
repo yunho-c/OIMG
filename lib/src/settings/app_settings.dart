@@ -24,6 +24,60 @@ enum BottomStatAnimationMode { ticker, flipper, off }
 
 const Object _noAppSettingsValue = Object();
 
+class StoredDirectoryAccess {
+  const StoredDirectoryAccess({required this.path, required this.bookmark});
+
+  final String path;
+  final String bookmark;
+
+  Map<String, String> toJson() => <String, String>{
+    'path': path,
+    'bookmark': bookmark,
+  };
+
+  static StoredDirectoryAccess? tryParse(Object? value) {
+    if (value is! Map) {
+      return null;
+    }
+    final path = value['path'];
+    final bookmark = value['bookmark'];
+    if (path is! String ||
+        path.isEmpty ||
+        bookmark is! String ||
+        bookmark.isEmpty) {
+      return null;
+    }
+    return StoredDirectoryAccess(path: path, bookmark: bookmark);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is StoredDirectoryAccess &&
+      other.path == path &&
+      other.bookmark == bookmark;
+
+  @override
+  int get hashCode => Object.hash(path, bookmark);
+}
+
+bool _storedDirectoryAccessListsEqual(
+  List<StoredDirectoryAccess> first,
+  List<StoredDirectoryAccess> second,
+) {
+  if (identical(first, second)) {
+    return true;
+  }
+  if (first.length != second.length) {
+    return false;
+  }
+  for (var index = 0; index < first.length; index += 1) {
+    if (first[index] != second[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 extension BottomStatAnimationModeLabels on BottomStatAnimationMode {
   String get label {
     return switch (this) {
@@ -123,6 +177,7 @@ class AppSettings {
     this.macOsCaptionButtonsEnabled = false,
     this.differentLocationPath,
     this.differentLocationBookmark,
+    this.sameFolderAccesses = const <StoredDirectoryAccess>[],
     this.previewPathHeaderEnabled = false,
     this.homeShaderSpeed = defaultHomeShaderSpeed,
     this.homeAcrylicPanelEnabled = true,
@@ -143,6 +198,7 @@ class AppSettings {
   final String keepSourceOptimizedSuffix;
   final String? differentLocationPath;
   final String? differentLocationBookmark;
+  final List<StoredDirectoryAccess> sameFolderAccesses;
   final bool preserveFolderStructure;
   final bool preserveOriginalDate;
   final bool preserveExif;
@@ -261,6 +317,7 @@ class AppSettings {
     String? keepSourceOptimizedSuffix,
     Object? differentLocationPath = _noAppSettingsValue,
     Object? differentLocationBookmark = _noAppSettingsValue,
+    List<StoredDirectoryAccess>? sameFolderAccesses,
     bool? preserveFolderStructure,
     bool? preserveOriginalDate,
     bool? preserveExif,
@@ -306,6 +363,7 @@ class AppSettings {
           identical(differentLocationBookmark, _noAppSettingsValue)
           ? this.differentLocationBookmark
           : differentLocationBookmark as String?,
+      sameFolderAccesses: sameFolderAccesses ?? this.sameFolderAccesses,
       preserveFolderStructure:
           preserveFolderStructure ?? this.preserveFolderStructure,
       preserveOriginalDate: preserveOriginalDate ?? this.preserveOriginalDate,
@@ -358,6 +416,9 @@ class AppSettings {
       'keepSourceOptimizedSuffix': keepSourceOptimizedSuffix,
       'differentLocationPath': differentLocationPath,
       'differentLocationBookmark': differentLocationBookmark,
+      'sameFolderAccesses': sameFolderAccesses
+          .map((access) => access.toJson())
+          .toList(growable: false),
       'preserveFolderStructure': preserveFolderStructure,
       'preserveOriginalDate': preserveOriginalDate,
       'preserveExif': preserveExif,
@@ -430,6 +491,11 @@ class AppSettings {
       differentLocationBookmark:
           json['differentLocationBookmark'] as String? ??
           defaults.differentLocationBookmark,
+      sameFolderAccesses:
+          (json['sameFolderAccesses'] as List<Object?>? ?? const [])
+              .map(StoredDirectoryAccess.tryParse)
+              .whereType<StoredDirectoryAccess>()
+              .toList(growable: false),
       preserveFolderStructure:
           json['preserveFolderStructure'] as bool? ??
           defaults.preserveFolderStructure,
@@ -509,6 +575,10 @@ class AppSettings {
         other.keepSourceOptimizedSuffix == keepSourceOptimizedSuffix &&
         other.differentLocationPath == differentLocationPath &&
         other.differentLocationBookmark == differentLocationBookmark &&
+        _storedDirectoryAccessListsEqual(
+          other.sameFolderAccesses,
+          sameFolderAccesses,
+        ) &&
         other.preserveFolderStructure == preserveFolderStructure &&
         other.preserveOriginalDate == preserveOriginalDate &&
         other.preserveExif == preserveExif &&
@@ -548,6 +618,7 @@ class AppSettings {
     keepSourceOptimizedSuffix,
     differentLocationPath,
     differentLocationBookmark,
+    Object.hashAll(sameFolderAccesses),
     preserveFolderStructure,
     preserveOriginalDate,
     preserveExif,
