@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 546530818;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1704679560;
 
 // Section: executor
 
@@ -434,6 +434,35 @@ fn wire__crate__api__bridge__get_process_file_batch_job_impl(
                     })(),
                 )
             }
+        },
+    )
+}
+fn wire__crate__api__bridge__gjxl_backend_compiled_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "gjxl_backend_compiled",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(crate::api::bridge::gjxl_backend_compiled())?;
+                Ok(output_ok)
+            })())
         },
     )
 }
@@ -1065,11 +1094,13 @@ impl SseDecode for crate::types::ConvertOptions {
         let mut var_quality = <u8>::sse_decode(deserializer);
         let mut var_effort = <Option<u8>>::sse_decode(deserializer);
         let mut var_pngPalette = <Option<crate::types::PngPaletteMode>>::sse_decode(deserializer);
+        let mut var_jxlEncoder = <crate::types::JxlEncoderPreference>::sse_decode(deserializer);
         return crate::types::ConvertOptions {
             target_format: var_targetFormat,
             quality: var_quality,
             effort: var_effort,
             png_palette: var_pngPalette,
+            jxl_encoder: var_jxlEncoder,
         };
     }
 }
@@ -1082,12 +1113,14 @@ impl SseDecode for crate::types::CropOptions {
         let mut var_quality = <u8>::sse_decode(deserializer);
         let mut var_effort = <Option<u8>>::sse_decode(deserializer);
         let mut var_pngPalette = <Option<crate::types::PngPaletteMode>>::sse_decode(deserializer);
+        let mut var_jxlEncoder = <crate::types::JxlEncoderPreference>::sse_decode(deserializer);
         return crate::types::CropOptions {
             crop: var_crop,
             target_format: var_targetFormat,
             quality: var_quality,
             effort: var_effort,
             png_palette: var_pngPalette,
+            jxl_encoder: var_jxlEncoder,
         };
     }
 }
@@ -1151,6 +1184,7 @@ impl SseDecode for crate::types::ExtendOptions {
         let mut var_quality = <u8>::sse_decode(deserializer);
         let mut var_effort = <Option<u8>>::sse_decode(deserializer);
         let mut var_pngPalette = <Option<crate::types::PngPaletteMode>>::sse_decode(deserializer);
+        let mut var_jxlEncoder = <crate::types::JxlEncoderPreference>::sse_decode(deserializer);
         return crate::types::ExtendOptions {
             extend: var_extend,
             fill: var_fill,
@@ -1158,6 +1192,7 @@ impl SseDecode for crate::types::ExtendOptions {
             quality: var_quality,
             effort: var_effort,
             png_palette: var_pngPalette,
+            jxl_encoder: var_jxlEncoder,
         };
     }
 }
@@ -1292,6 +1327,18 @@ impl SseDecode for crate::types::ImageOperation {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseDecode for crate::types::JxlEncoderPreference {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::types::JxlEncoderPreference::Libjxl,
+            1 => crate::types::JxlEncoderPreference::PreferGjxl,
+            _ => unreachable!("Invalid variant for JxlEncoderPreference: {}", inner),
+        };
     }
 }
 
@@ -1509,11 +1556,13 @@ impl SseDecode for crate::types::OptimizeOptions {
         let mut var_quality = <u8>::sse_decode(deserializer);
         let mut var_effort = <Option<u8>>::sse_decode(deserializer);
         let mut var_pngPalette = <Option<crate::types::PngPaletteMode>>::sse_decode(deserializer);
+        let mut var_jxlEncoder = <crate::types::JxlEncoderPreference>::sse_decode(deserializer);
         let mut var_writeOnlyIfSmaller = <bool>::sse_decode(deserializer);
         return crate::types::OptimizeOptions {
             quality: var_quality,
             effort: var_effort,
             png_palette: var_pngPalette,
+            jxl_encoder: var_jxlEncoder,
             write_only_if_smaller: var_writeOnlyIfSmaller,
         };
     }
@@ -1718,12 +1767,14 @@ impl SseDecode for crate::types::ResizeOptions {
         let mut var_quality = <u8>::sse_decode(deserializer);
         let mut var_effort = <Option<u8>>::sse_decode(deserializer);
         let mut var_pngPalette = <Option<crate::types::PngPaletteMode>>::sse_decode(deserializer);
+        let mut var_jxlEncoder = <crate::types::JxlEncoderPreference>::sse_decode(deserializer);
         return crate::types::ResizeOptions {
             resize: var_resize,
             target_format: var_targetFormat,
             quality: var_quality,
             effort: var_effort,
             png_palette: var_pngPalette,
+            jxl_encoder: var_jxlEncoder,
         };
     }
 }
@@ -1942,18 +1993,18 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__bridge__init_app_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__bridge__inspect_bytes_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__bridge__inspect_file_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__bridge__preview_file_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__bridge__process_bytes_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__bridge__process_file_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__bridge__process_file_batch_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__bridge__process_files_impl(port, ptr, rust_vec_len, data_len),
-        21 => {
+        13 => wire__crate__api__bridge__init_app_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__bridge__inspect_bytes_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__bridge__inspect_file_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__bridge__preview_file_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__bridge__process_bytes_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__bridge__process_file_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__bridge__process_file_batch_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__bridge__process_files_impl(port, ptr, rust_vec_len, data_len),
+        22 => {
             wire__crate__api__bridge__start_analyze_file_job_impl(port, ptr, rust_vec_len, data_len)
         }
-        22 => wire__crate__api__bridge__start_process_file_batch_job_impl(
+        23 => wire__crate__api__bridge__start_process_file_batch_job_impl(
             port,
             ptr,
             rust_vec_len,
@@ -1971,9 +2022,10 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        20 => wire__crate__api__bridge__set_timing_logs_enabled_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__bridge__supported_formats_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__bridge__version_impl(ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__bridge__gjxl_backend_compiled_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__bridge__set_timing_logs_enabled_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__bridge__supported_formats_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__bridge__version_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2188,6 +2240,7 @@ impl flutter_rust_bridge::IntoDart for crate::types::ConvertOptions {
             self.quality.into_into_dart().into_dart(),
             self.effort.into_into_dart().into_dart(),
             self.png_palette.into_into_dart().into_dart(),
+            self.jxl_encoder.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2209,6 +2262,7 @@ impl flutter_rust_bridge::IntoDart for crate::types::CropOptions {
             self.quality.into_into_dart().into_dart(),
             self.effort.into_into_dart().into_dart(),
             self.png_palette.into_into_dart().into_dart(),
+            self.jxl_encoder.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2288,6 +2342,7 @@ impl flutter_rust_bridge::IntoDart for crate::types::ExtendOptions {
             self.quality.into_into_dart().into_dart(),
             self.effort.into_into_dart().into_dart(),
             self.png_palette.into_into_dart().into_dart(),
+            self.jxl_encoder.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2425,12 +2480,34 @@ impl flutter_rust_bridge::IntoIntoDart<crate::types::ImageOperation>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::types::JxlEncoderPreference {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Libjxl => 0.into_dart(),
+            Self::PreferGjxl => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::types::JxlEncoderPreference
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::types::JxlEncoderPreference>
+    for crate::types::JxlEncoderPreference
+{
+    fn into_into_dart(self) -> crate::types::JxlEncoderPreference {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::types::OptimizeOptions {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.quality.into_into_dart().into_dart(),
             self.effort.into_into_dart().into_dart(),
             self.png_palette.into_into_dart().into_dart(),
+            self.jxl_encoder.into_into_dart().into_dart(),
             self.write_only_if_smaller.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -2715,6 +2792,7 @@ impl flutter_rust_bridge::IntoDart for crate::types::ResizeOptions {
             self.quality.into_into_dart().into_dart(),
             self.effort.into_into_dart().into_dart(),
             self.png_palette.into_into_dart().into_dart(),
+            self.jxl_encoder.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2959,6 +3037,7 @@ impl SseEncode for crate::types::ConvertOptions {
         <u8>::sse_encode(self.quality, serializer);
         <Option<u8>>::sse_encode(self.effort, serializer);
         <Option<crate::types::PngPaletteMode>>::sse_encode(self.png_palette, serializer);
+        <crate::types::JxlEncoderPreference>::sse_encode(self.jxl_encoder, serializer);
     }
 }
 
@@ -2970,6 +3049,7 @@ impl SseEncode for crate::types::CropOptions {
         <u8>::sse_encode(self.quality, serializer);
         <Option<u8>>::sse_encode(self.effort, serializer);
         <Option<crate::types::PngPaletteMode>>::sse_encode(self.png_palette, serializer);
+        <crate::types::JxlEncoderPreference>::sse_encode(self.jxl_encoder, serializer);
     }
 }
 
@@ -3021,6 +3101,7 @@ impl SseEncode for crate::types::ExtendOptions {
         <u8>::sse_encode(self.quality, serializer);
         <Option<u8>>::sse_encode(self.effort, serializer);
         <Option<crate::types::PngPaletteMode>>::sse_encode(self.png_palette, serializer);
+        <crate::types::JxlEncoderPreference>::sse_encode(self.jxl_encoder, serializer);
     }
 }
 
@@ -3128,6 +3209,22 @@ impl SseEncode for crate::types::ImageOperation {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseEncode for crate::types::JxlEncoderPreference {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::types::JxlEncoderPreference::Libjxl => 0,
+                crate::types::JxlEncoderPreference::PreferGjxl => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 
@@ -3317,6 +3414,7 @@ impl SseEncode for crate::types::OptimizeOptions {
         <u8>::sse_encode(self.quality, serializer);
         <Option<u8>>::sse_encode(self.effort, serializer);
         <Option<crate::types::PngPaletteMode>>::sse_encode(self.png_palette, serializer);
+        <crate::types::JxlEncoderPreference>::sse_encode(self.jxl_encoder, serializer);
         <bool>::sse_encode(self.write_only_if_smaller, serializer);
     }
 }
@@ -3470,6 +3568,7 @@ impl SseEncode for crate::types::ResizeOptions {
         <u8>::sse_encode(self.quality, serializer);
         <Option<u8>>::sse_encode(self.effort, serializer);
         <Option<crate::types::PngPaletteMode>>::sse_encode(self.png_palette, serializer);
+        <crate::types::JxlEncoderPreference>::sse_encode(self.jxl_encoder, serializer);
     }
 }
 

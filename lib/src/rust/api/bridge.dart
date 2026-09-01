@@ -15,6 +15,9 @@ String version() => RustLib.instance.api.crateApiBridgeVersion();
 List<FormatInfo> supportedFormats() =>
     RustLib.instance.api.crateApiBridgeSupportedFormats();
 
+bool gjxlBackendCompiled() =>
+    RustLib.instance.api.crateApiBridgeGjxlBackendCompiled();
+
 void setTimingLogsEnabled({required bool enabled}) =>
     RustLib.instance.api.crateApiBridgeSetTimingLogsEnabled(enabled: enabled);
 

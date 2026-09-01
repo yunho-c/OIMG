@@ -10,6 +10,8 @@ class SlimgBridge {
 
   List<FormatInfo> supportedFormats() => bridge_api.supportedFormats();
 
+  bool gjxlBackendCompiled() => bridge_api.gjxlBackendCompiled();
+
   Future<ImageMetadata> inspectFile({required String inputPath}) =>
       bridge_api.inspectFile(inputPath: inputPath);
 

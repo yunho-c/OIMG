@@ -281,12 +281,14 @@ class ConvertOptions {
   final int quality;
   final int? effort;
   final PngPaletteMode? pngPalette;
+  final JxlEncoderPreference jxlEncoder;
 
   const ConvertOptions({
     required this.targetFormat,
     required this.quality,
     this.effort,
     this.pngPalette,
+    required this.jxlEncoder,
   });
 
   @override
@@ -294,7 +296,8 @@ class ConvertOptions {
       targetFormat.hashCode ^
       quality.hashCode ^
       effort.hashCode ^
-      pngPalette.hashCode;
+      pngPalette.hashCode ^
+      jxlEncoder.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -304,7 +307,8 @@ class ConvertOptions {
           targetFormat == other.targetFormat &&
           quality == other.quality &&
           effort == other.effort &&
-          pngPalette == other.pngPalette;
+          pngPalette == other.pngPalette &&
+          jxlEncoder == other.jxlEncoder;
 }
 
 class CropOptions {
@@ -313,6 +317,7 @@ class CropOptions {
   final int quality;
   final int? effort;
   final PngPaletteMode? pngPalette;
+  final JxlEncoderPreference jxlEncoder;
 
   const CropOptions({
     required this.crop,
@@ -320,6 +325,7 @@ class CropOptions {
     required this.quality,
     this.effort,
     this.pngPalette,
+    required this.jxlEncoder,
   });
 
   @override
@@ -328,7 +334,8 @@ class CropOptions {
       targetFormat.hashCode ^
       quality.hashCode ^
       effort.hashCode ^
-      pngPalette.hashCode;
+      pngPalette.hashCode ^
+      jxlEncoder.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -339,7 +346,8 @@ class CropOptions {
           targetFormat == other.targetFormat &&
           quality == other.quality &&
           effort == other.effort &&
-          pngPalette == other.pngPalette;
+          pngPalette == other.pngPalette &&
+          jxlEncoder == other.jxlEncoder;
 }
 
 @freezed
@@ -400,6 +408,7 @@ class ExtendOptions {
   final int quality;
   final int? effort;
   final PngPaletteMode? pngPalette;
+  final JxlEncoderPreference jxlEncoder;
 
   const ExtendOptions({
     required this.extend,
@@ -408,6 +417,7 @@ class ExtendOptions {
     required this.quality,
     this.effort,
     this.pngPalette,
+    required this.jxlEncoder,
   });
 
   @override
@@ -417,7 +427,8 @@ class ExtendOptions {
       targetFormat.hashCode ^
       quality.hashCode ^
       effort.hashCode ^
-      pngPalette.hashCode;
+      pngPalette.hashCode ^
+      jxlEncoder.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -429,7 +440,8 @@ class ExtendOptions {
           targetFormat == other.targetFormat &&
           quality == other.quality &&
           effort == other.effort &&
-          pngPalette == other.pngPalette;
+          pngPalette == other.pngPalette &&
+          jxlEncoder == other.jxlEncoder;
 }
 
 @freezed
@@ -531,16 +543,20 @@ sealed class ImageOperation with _$ImageOperation {
       ImageOperation_Extend;
 }
 
+enum JxlEncoderPreference { libjxl, preferGjxl }
+
 class OptimizeOptions {
   final int quality;
   final int? effort;
   final PngPaletteMode? pngPalette;
+  final JxlEncoderPreference jxlEncoder;
   final bool writeOnlyIfSmaller;
 
   const OptimizeOptions({
     required this.quality,
     this.effort,
     this.pngPalette,
+    required this.jxlEncoder,
     required this.writeOnlyIfSmaller,
   });
 
@@ -549,6 +565,7 @@ class OptimizeOptions {
       quality.hashCode ^
       effort.hashCode ^
       pngPalette.hashCode ^
+      jxlEncoder.hashCode ^
       writeOnlyIfSmaller.hashCode;
 
   @override
@@ -559,6 +576,7 @@ class OptimizeOptions {
           quality == other.quality &&
           effort == other.effort &&
           pngPalette == other.pngPalette &&
+          jxlEncoder == other.jxlEncoder &&
           writeOnlyIfSmaller == other.writeOnlyIfSmaller;
 }
 
@@ -869,6 +887,7 @@ class ResizeOptions {
   final int quality;
   final int? effort;
   final PngPaletteMode? pngPalette;
+  final JxlEncoderPreference jxlEncoder;
 
   const ResizeOptions({
     required this.resize,
@@ -876,6 +895,7 @@ class ResizeOptions {
     required this.quality,
     this.effort,
     this.pngPalette,
+    required this.jxlEncoder,
   });
 
   @override
@@ -884,7 +904,8 @@ class ResizeOptions {
       targetFormat.hashCode ^
       quality.hashCode ^
       effort.hashCode ^
-      pngPalette.hashCode;
+      pngPalette.hashCode ^
+      jxlEncoder.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -895,7 +916,8 @@ class ResizeOptions {
           targetFormat == other.targetFormat &&
           quality == other.quality &&
           effort == other.effort &&
-          pngPalette == other.pngPalette;
+          pngPalette == other.pngPalette &&
+          jxlEncoder == other.jxlEncoder;
 }
 
 @freezed

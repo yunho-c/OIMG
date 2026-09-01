@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => 546530818;
+  int get rustContentHash => -1704679560;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -116,6 +116,8 @@ abstract class RustLibApi extends BaseApi {
   Future<BatchJobSnapshot> crateApiBridgeGetProcessFileBatchJob({
     required String jobId,
   });
+
+  bool crateApiBridgeGjxlBackendCompiled();
 
   Future<void> crateApiBridgeInitApp();
 
@@ -527,6 +529,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  bool crateApiBridgeGjxlBackendCompiled() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeGjxlBackendCompiledConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeGjxlBackendCompiledConstMeta =>
+      const TaskConstMeta(debugName: "gjxl_backend_compiled", argNames: []);
+
+  @override
   Future<void> crateApiBridgeInitApp() {
     return handler.executeNormal(
       NormalTask(
@@ -535,7 +559,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 13,
             port: port_,
           );
         },
@@ -563,7 +587,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 14,
             port: port_,
           );
         },
@@ -591,7 +615,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 15,
             port: port_,
           );
         },
@@ -621,7 +645,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 16,
             port: port_,
           );
         },
@@ -651,7 +675,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 17,
             port: port_,
           );
         },
@@ -681,7 +705,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 18,
             port: port_,
           );
         },
@@ -714,7 +738,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 19,
             port: port_,
           );
         },
@@ -747,7 +771,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 20,
             port: port_,
           );
         },
@@ -772,7 +796,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_bool(enabled, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -803,7 +827,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 22,
             port: port_,
           );
         },
@@ -839,7 +863,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 23,
             port: port_,
           );
         },
@@ -866,7 +890,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_format_info,
@@ -888,7 +912,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1195,13 +1219,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ConvertOptions dco_decode_convert_options(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return ConvertOptions(
       targetFormat: dco_decode_String(arr[0]),
       quality: dco_decode_u_8(arr[1]),
       effort: dco_decode_opt_box_autoadd_u_8(arr[2]),
       pngPalette: dco_decode_opt_box_autoadd_png_palette_mode(arr[3]),
+      jxlEncoder: dco_decode_jxl_encoder_preference(arr[4]),
     );
   }
 
@@ -1209,14 +1234,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CropOptions dco_decode_crop_options(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return CropOptions(
       crop: dco_decode_crop_spec(arr[0]),
       targetFormat: dco_decode_opt_String(arr[1]),
       quality: dco_decode_u_8(arr[2]),
       effort: dco_decode_opt_box_autoadd_u_8(arr[3]),
       pngPalette: dco_decode_opt_box_autoadd_png_palette_mode(arr[4]),
+      jxlEncoder: dco_decode_jxl_encoder_preference(arr[5]),
     );
   }
 
@@ -1260,8 +1286,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ExtendOptions dco_decode_extend_options(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return ExtendOptions(
       extend: dco_decode_extend_spec(arr[0]),
       fill: dco_decode_opt_box_autoadd_fill_spec(arr[1]),
@@ -1269,6 +1295,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       quality: dco_decode_u_8(arr[3]),
       effort: dco_decode_opt_box_autoadd_u_8(arr[4]),
       pngPalette: dco_decode_opt_box_autoadd_png_palette_mode(arr[5]),
+      jxlEncoder: dco_decode_jxl_encoder_preference(arr[6]),
     );
   }
 
@@ -1374,6 +1401,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw Exception("unreachable");
     }
+  }
+
+  @protected
+  JxlEncoderPreference dco_decode_jxl_encoder_preference(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return JxlEncoderPreference.values[raw as int];
   }
 
   @protected
@@ -1501,13 +1534,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   OptimizeOptions dco_decode_optimize_options(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return OptimizeOptions(
       quality: dco_decode_u_8(arr[0]),
       effort: dco_decode_opt_box_autoadd_u_8(arr[1]),
       pngPalette: dco_decode_opt_box_autoadd_png_palette_mode(arr[2]),
-      writeOnlyIfSmaller: dco_decode_bool(arr[3]),
+      jxlEncoder: dco_decode_jxl_encoder_preference(arr[3]),
+      writeOnlyIfSmaller: dco_decode_bool(arr[4]),
     );
   }
 
@@ -1670,14 +1704,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ResizeOptions dco_decode_resize_options(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return ResizeOptions(
       resize: dco_decode_resize_spec(arr[0]),
       targetFormat: dco_decode_opt_String(arr[1]),
       quality: dco_decode_u_8(arr[2]),
       effort: dco_decode_opt_box_autoadd_u_8(arr[3]),
       pngPalette: dco_decode_opt_box_autoadd_png_palette_mode(arr[4]),
+      jxlEncoder: dco_decode_jxl_encoder_preference(arr[5]),
     );
   }
 
@@ -2120,11 +2155,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_pngPalette = sse_decode_opt_box_autoadd_png_palette_mode(
       deserializer,
     );
+    var var_jxlEncoder = sse_decode_jxl_encoder_preference(deserializer);
     return ConvertOptions(
       targetFormat: var_targetFormat,
       quality: var_quality,
       effort: var_effort,
       pngPalette: var_pngPalette,
+      jxlEncoder: var_jxlEncoder,
     );
   }
 
@@ -2138,12 +2175,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_pngPalette = sse_decode_opt_box_autoadd_png_palette_mode(
       deserializer,
     );
+    var var_jxlEncoder = sse_decode_jxl_encoder_preference(deserializer);
     return CropOptions(
       crop: var_crop,
       targetFormat: var_targetFormat,
       quality: var_quality,
       effort: var_effort,
       pngPalette: var_pngPalette,
+      jxlEncoder: var_jxlEncoder,
     );
   }
 
@@ -2203,6 +2242,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_pngPalette = sse_decode_opt_box_autoadd_png_palette_mode(
       deserializer,
     );
+    var var_jxlEncoder = sse_decode_jxl_encoder_preference(deserializer);
     return ExtendOptions(
       extend: var_extend,
       fill: var_fill,
@@ -2210,6 +2250,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       quality: var_quality,
       effort: var_effort,
       pngPalette: var_pngPalette,
+      jxlEncoder: var_jxlEncoder,
     );
   }
 
@@ -2317,6 +2358,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw UnimplementedError('');
     }
+  }
+
+  @protected
+  JxlEncoderPreference sse_decode_jxl_encoder_preference(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return JxlEncoderPreference.values[inner];
   }
 
   @protected
@@ -2552,11 +2602,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_pngPalette = sse_decode_opt_box_autoadd_png_palette_mode(
       deserializer,
     );
+    var var_jxlEncoder = sse_decode_jxl_encoder_preference(deserializer);
     var var_writeOnlyIfSmaller = sse_decode_bool(deserializer);
     return OptimizeOptions(
       quality: var_quality,
       effort: var_effort,
       pngPalette: var_pngPalette,
+      jxlEncoder: var_jxlEncoder,
       writeOnlyIfSmaller: var_writeOnlyIfSmaller,
     );
   }
@@ -2751,12 +2803,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_pngPalette = sse_decode_opt_box_autoadd_png_palette_mode(
       deserializer,
     );
+    var var_jxlEncoder = sse_decode_jxl_encoder_preference(deserializer);
     return ResizeOptions(
       resize: var_resize,
       targetFormat: var_targetFormat,
       quality: var_quality,
       effort: var_effort,
       pngPalette: var_pngPalette,
+      jxlEncoder: var_jxlEncoder,
     );
   }
 
@@ -3197,6 +3251,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_8(self.quality, serializer);
     sse_encode_opt_box_autoadd_u_8(self.effort, serializer);
     sse_encode_opt_box_autoadd_png_palette_mode(self.pngPalette, serializer);
+    sse_encode_jxl_encoder_preference(self.jxlEncoder, serializer);
   }
 
   @protected
@@ -3207,6 +3262,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_8(self.quality, serializer);
     sse_encode_opt_box_autoadd_u_8(self.effort, serializer);
     sse_encode_opt_box_autoadd_png_palette_mode(self.pngPalette, serializer);
+    sse_encode_jxl_encoder_preference(self.jxlEncoder, serializer);
   }
 
   @protected
@@ -3253,6 +3309,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_8(self.quality, serializer);
     sse_encode_opt_box_autoadd_u_8(self.effort, serializer);
     sse_encode_opt_box_autoadd_png_palette_mode(self.pngPalette, serializer);
+    sse_encode_jxl_encoder_preference(self.jxlEncoder, serializer);
   }
 
   @protected
@@ -3338,6 +3395,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_i_32(4, serializer);
         sse_encode_box_autoadd_extend_options(field0, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_jxl_encoder_preference(
+    JxlEncoderPreference self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected
@@ -3569,6 +3635,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_8(self.quality, serializer);
     sse_encode_opt_box_autoadd_u_8(self.effort, serializer);
     sse_encode_opt_box_autoadd_png_palette_mode(self.pngPalette, serializer);
+    sse_encode_jxl_encoder_preference(self.jxlEncoder, serializer);
     sse_encode_bool(self.writeOnlyIfSmaller, serializer);
   }
 
@@ -3719,6 +3786,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_8(self.quality, serializer);
     sse_encode_opt_box_autoadd_u_8(self.effort, serializer);
     sse_encode_opt_box_autoadd_png_palette_mode(self.pngPalette, serializer);
+    sse_encode_jxl_encoder_preference(self.jxlEncoder, serializer);
   }
 
   @protected

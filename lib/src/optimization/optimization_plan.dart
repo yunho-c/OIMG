@@ -35,6 +35,7 @@ OptimizationPlan buildOptimizationPlan({
   required OpenedImageFile file,
   required AppSettings settings,
   String? sourceRootPath,
+  JxlEncoderPreference jxlEncoder = JxlEncoderPreference.libjxl,
 }) {
   final targetCodec = settings.effectiveCodec;
   final targetFormat = codecIdOf(targetCodec);
@@ -46,6 +47,9 @@ OptimizationPlan buildOptimizationPlan({
   final pngPaletteMode = targetCodec == PreferredCodec.png
       ? _pngPaletteModeOf(settings.pngPaletteMode)
       : null;
+  final effectiveJxlEncoder = targetCodec == PreferredCodec.jxl
+      ? jxlEncoder
+      : JxlEncoderPreference.libjxl;
   final useSourceImageForPreview = switch (targetCodec) {
     PreferredCodec.png => settings.pngPaletteMode == PngPalettePreference.off,
     PreferredCodec.webp => effectiveQuality == 100,
@@ -58,6 +62,7 @@ OptimizationPlan buildOptimizationPlan({
             quality: effectiveQuality,
             effort: effort,
             pngPalette: pngPaletteMode,
+            jxlEncoder: effectiveJxlEncoder,
             writeOnlyIfSmaller: true,
           ),
         )
@@ -67,6 +72,7 @@ OptimizationPlan buildOptimizationPlan({
             quality: effectiveQuality,
             effort: effort,
             pngPalette: pngPaletteMode,
+            jxlEncoder: effectiveJxlEncoder,
           ),
         );
   final storageDecision = _resolveStorageDecision(

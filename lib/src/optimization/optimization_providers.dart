@@ -17,6 +17,26 @@ import 'package:oimg/src/settings/developer_diagnostics.dart';
 import 'optimization_plan.dart';
 
 final slimgApiProvider = Provider<SlimgApi>((ref) => const FrbSlimgApi());
+
+final gjxlBackendCompiledProvider = Provider<bool>(
+  (ref) => ref.watch(slimgApiProvider).gjxlBackendCompiled(),
+);
+
+class JxlEncoderPreferenceNotifier extends Notifier<JxlEncoderPreference> {
+  @override
+  JxlEncoderPreference build() => JxlEncoderPreference.libjxl;
+
+  void setPreferGjxl(bool enabled) {
+    state = enabled
+        ? JxlEncoderPreference.preferGjxl
+        : JxlEncoderPreference.libjxl;
+  }
+}
+
+final jxlEncoderPreferenceProvider =
+    NotifierProvider<JxlEncoderPreferenceNotifier, JxlEncoderPreference>(
+      JxlEncoderPreferenceNotifier.new,
+    );
 int _previewRequestSequence = 0;
 int _previewDifferenceRequestSequence = 0;
 int _previewPixelMatchRequestSequence = 0;
@@ -404,6 +424,7 @@ ImageOperation _normalizeAnalyzeOperation(ImageOperation operation) {
         quality: 0,
         effort: options.effort,
         pngPalette: options.pngPalette,
+        jxlEncoder: options.jxlEncoder,
       ),
     ),
     optimize: (options) => ImageOperation.optimize(
@@ -411,6 +432,7 @@ ImageOperation _normalizeAnalyzeOperation(ImageOperation operation) {
         quality: 0,
         effort: options.effort,
         pngPalette: options.pngPalette,
+        jxlEncoder: options.jxlEncoder,
         writeOnlyIfSmaller: options.writeOnlyIfSmaller,
       ),
     ),
@@ -421,6 +443,7 @@ ImageOperation _normalizeAnalyzeOperation(ImageOperation operation) {
         quality: 0,
         effort: options.effort,
         pngPalette: options.pngPalette,
+        jxlEncoder: options.jxlEncoder,
       ),
     ),
     crop: (options) => ImageOperation.crop(
@@ -430,6 +453,7 @@ ImageOperation _normalizeAnalyzeOperation(ImageOperation operation) {
         quality: 0,
         effort: options.effort,
         pngPalette: options.pngPalette,
+        jxlEncoder: options.jxlEncoder,
       ),
     ),
     extend: (options) => ImageOperation.extend(
@@ -440,6 +464,7 @@ ImageOperation _normalizeAnalyzeOperation(ImageOperation operation) {
         quality: 0,
         effort: options.effort,
         pngPalette: options.pngPalette,
+        jxlEncoder: options.jxlEncoder,
       ),
     ),
   );
@@ -637,7 +662,12 @@ final currentOptimizationPlanProvider =
       }
 
       final settings = await ref.watch(appSettingsProvider.future);
-      return buildOptimizationPlan(file: currentFile, settings: settings);
+      final jxlEncoder = ref.watch(jxlEncoderPreferenceProvider);
+      return buildOptimizationPlan(
+        file: currentFile,
+        settings: settings,
+        jxlEncoder: jxlEncoder,
+      );
     });
 
 final analyzeAvailabilityProvider = Provider.autoDispose<AnalyzeAvailability>((
@@ -1672,6 +1702,7 @@ class OptimizationRunController extends Notifier<OptimizationRunState> {
 
     final fileController = ref.read(fileOpenControllerProvider);
     final settings = await ref.read(appSettingsProvider.future);
+    final jxlEncoder = ref.read(jxlEncoderPreferenceProvider);
     if (settings.storageDestinationMode == StorageDestinationMode.sameFolder) {
       final accessResult = await fileController
           .ensureWritableContainingDirectoryAccess(
@@ -1726,6 +1757,7 @@ class OptimizationRunController extends Notifier<OptimizationRunState> {
             file: file,
             settings: settings,
             sourceRootPath: fileController.selectedFolderPath,
+            jxlEncoder: jxlEncoder,
           ),
         )
         .toList(growable: false);

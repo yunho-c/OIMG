@@ -7,6 +7,8 @@ abstract class SlimgApi {
 
   Future<ImageMetadata> inspectFile({required String inputPath});
 
+  bool gjxlBackendCompiled();
+
   void setTimingLogsEnabled({required bool enabled});
 
   Future<PreviewResult> previewFile({required PreviewFileRequest request});
@@ -66,6 +68,9 @@ class FrbSlimgApi implements SlimgApi {
   Future<ImageMetadata> inspectFile({required String inputPath}) {
     return _bridge.inspectFile(inputPath: inputPath);
   }
+
+  @override
+  bool gjxlBackendCompiled() => _bridge.gjxlBackendCompiled();
 
   @override
   void setTimingLogsEnabled({required bool enabled}) {

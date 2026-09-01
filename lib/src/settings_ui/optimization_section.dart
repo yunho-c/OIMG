@@ -21,6 +21,8 @@ class _OptimizationCollapsibleState
   @override
   Widget build(BuildContext context) {
     final notifier = ref.read(appSettingsProvider.notifier);
+    final gjxlBackendCompiled = ref.watch(gjxlBackendCompiledProvider);
+    final jxlEncoderPreference = ref.watch(jxlEncoderPreferenceProvider);
     final paletteSuitability = ref
         .watch(currentPreviewProvider)
         .asData
@@ -39,6 +41,7 @@ class _OptimizationCollapsibleState
               children: [
                 Expanded(child: const Text('Optimization').small().medium()),
                 GhostButton(
+                  key: const ValueKey('optimization-collapsible-toggle'),
                   onPressed: () {
                     setState(() {
                       _isExpanded = !_isExpanded;
@@ -105,6 +108,33 @@ class _OptimizationCollapsibleState
                                 notifier.setEffort(value.round());
                               },
                       ),
+                      if (widget.settings.effectiveCodec ==
+                              PreferredCodec.jxl &&
+                          gjxlBackendCompiled) ...[
+                        const SizedBox(height: 12),
+                        Checkbox(
+                          key: const ValueKey('prefer-gjxl-checkbox'),
+                          state:
+                              jxlEncoderPreference ==
+                                  JxlEncoderPreference.preferGjxl
+                              ? CheckboxState.checked
+                              : CheckboxState.unchecked,
+                          onChanged: widget.controlsLocked
+                              ? null
+                              : (value) {
+                                  ref
+                                      .read(
+                                        jxlEncoderPreferenceProvider.notifier,
+                                      )
+                                      .setPreferGjxl(
+                                        value == CheckboxState.checked,
+                                      );
+                                },
+                          trailing: Expanded(
+                            child: const Text('Use GJXL').small(),
+                          ),
+                        ),
+                      ],
                       if (widget.settings.effectiveCodec ==
                           PreferredCodec.png) ...[
                         const SizedBox(height: 12),

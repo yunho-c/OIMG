@@ -5,9 +5,10 @@ pub use crate::types::{
     AnalyzeFileJobHandle, AnalyzeFileJobSnapshot, AnalyzeFileRequest, AnalyzeSampleResult,
     BatchItemResult, BatchJobHandle, BatchJobSnapshot, BatchJobState, BatchProcessRequest,
     ConvertOptions, CropOptions, CropSpec, EncodedImageResult, ExtendOptions, ExtendSpec, FillSpec,
-    FormatInfo, ImageMetadata, ImageOperation, OptimizeOptions, PreviewArtifactRequest,
-    PreviewFileRequest, PreviewResult, ProcessBytesRequest, ProcessFileBatchRequest,
-    ProcessFileRequest, ProcessResult, RawImageResult, ResizeOptions, ResizeSpec,
+    FormatInfo, ImageMetadata, ImageOperation, JxlEncoderPreference, OptimizeOptions,
+    PreviewArtifactRequest, PreviewFileRequest, PreviewResult, ProcessBytesRequest,
+    ProcessFileBatchRequest, ProcessFileRequest, ProcessResult, RawImageResult, ResizeOptions,
+    ResizeSpec,
 };
 
 use crate::error::{panic_message, Result};
@@ -25,6 +26,11 @@ pub fn version() -> String {
 #[flutter_rust_bridge::frb(sync)]
 pub fn supported_formats() -> Vec<FormatInfo> {
     crate::codec::format_info()
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn gjxl_backend_compiled() -> bool {
+    slimg_core::codec::jxl::gjxl_backend_compiled()
 }
 
 #[flutter_rust_bridge::frb(sync)]

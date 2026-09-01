@@ -612,6 +612,9 @@ class _FakeSlimgApi implements SlimgApi {
   int maxConcurrentInspections = 0;
 
   @override
+  bool gjxlBackendCompiled() => false;
+
+  @override
   void setTimingLogsEnabled({required bool enabled}) {}
 
   @override

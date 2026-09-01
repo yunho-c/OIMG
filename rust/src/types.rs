@@ -209,6 +209,7 @@ pub struct ConvertOptions {
     pub quality: u8,
     pub effort: Option<u8>,
     pub png_palette: Option<PngPaletteMode>,
+    pub jxl_encoder: JxlEncoderPreference,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,7 +217,15 @@ pub struct OptimizeOptions {
     pub quality: u8,
     pub effort: Option<u8>,
     pub png_palette: Option<PngPaletteMode>,
+    pub jxl_encoder: JxlEncoderPreference,
     pub write_only_if_smaller: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum JxlEncoderPreference {
+    #[default]
+    Libjxl,
+    PreferGjxl,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -243,6 +252,7 @@ pub struct ResizeOptions {
     pub quality: u8,
     pub effort: Option<u8>,
     pub png_palette: Option<PngPaletteMode>,
+    pub jxl_encoder: JxlEncoderPreference,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -266,6 +276,7 @@ pub struct CropOptions {
     pub quality: u8,
     pub effort: Option<u8>,
     pub png_palette: Option<PngPaletteMode>,
+    pub jxl_encoder: JxlEncoderPreference,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -288,6 +299,7 @@ pub struct ExtendOptions {
     pub quality: u8,
     pub effort: Option<u8>,
     pub png_palette: Option<PngPaletteMode>,
+    pub jxl_encoder: JxlEncoderPreference,
 }
 
 impl ImageOperation {
@@ -308,11 +320,13 @@ impl ImageOperation {
                 quality,
                 effort: options.effort,
                 png_palette: options.png_palette,
+                jxl_encoder: options.jxl_encoder,
             }),
             Self::Optimize(options) => Self::Optimize(OptimizeOptions {
                 quality,
                 effort: options.effort,
                 png_palette: options.png_palette,
+                jxl_encoder: options.jxl_encoder,
                 write_only_if_smaller: options.write_only_if_smaller,
             }),
             Self::Resize(options) => Self::Resize(ResizeOptions {
@@ -321,6 +335,7 @@ impl ImageOperation {
                 quality,
                 effort: options.effort,
                 png_palette: options.png_palette,
+                jxl_encoder: options.jxl_encoder,
             }),
             Self::Crop(options) => Self::Crop(CropOptions {
                 crop: options.crop.clone(),
@@ -328,6 +343,7 @@ impl ImageOperation {
                 quality,
                 effort: options.effort,
                 png_palette: options.png_palette,
+                jxl_encoder: options.jxl_encoder,
             }),
             Self::Extend(options) => Self::Extend(ExtendOptions {
                 extend: options.extend.clone(),
@@ -336,6 +352,7 @@ impl ImageOperation {
                 quality,
                 effort: options.effort,
                 png_palette: options.png_palette,
+                jxl_encoder: options.jxl_encoder,
             }),
         }
     }
@@ -347,6 +364,15 @@ impl PngPaletteMode {
             Self::Off => slimg_core::PngPaletteMode::Off,
             Self::Auto => slimg_core::PngPaletteMode::Auto,
             Self::On => slimg_core::PngPaletteMode::On,
+        }
+    }
+}
+
+impl JxlEncoderPreference {
+    pub(crate) fn to_core(self) -> slimg_core::JxlEncoderPreference {
+        match self {
+            Self::Libjxl => slimg_core::JxlEncoderPreference::Libjxl,
+            Self::PreferGjxl => slimg_core::JxlEncoderPreference::PreferGjxl,
         }
     }
 }

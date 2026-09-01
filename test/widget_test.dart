@@ -3304,6 +3304,100 @@ void main() {
   });
 
   testWidgets(
+    'uses the session-only GJXL preference for preview and queued work',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1400, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final store = _FakeAppSettingsStore()
+        ..value = AppSettings.defaults
+            .copyWith(advancedMode: true, preferredCodec: PreferredCodec.jxl)
+            .toJsonString();
+      final persistedSettings = store.value;
+      final slimg = _FakeSlimgApi(
+        inspectResults: {'/tmp/first.png': _metadata('png', 2400)},
+        gjxlBackendAvailable: true,
+      );
+      final controller = FileOpenController(
+        channel: _FakeFileOpenChannel(),
+        slimg: slimg,
+        initialPaths: const ['/tmp/first.png'],
+      );
+      await controller.initialize();
+
+      await tester.pumpWidget(
+        _buildApp(controller: controller, slimg: slimg, store: store),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('optimization-collapsible-toggle')),
+      );
+      await tester.pumpAndSettle();
+
+      final checkboxFinder = find.byKey(const ValueKey('prefer-gjxl-checkbox'));
+      expect(checkboxFinder, findsOneWidget);
+      expect(
+        tester.widget<Checkbox>(checkboxFinder).state,
+        CheckboxState.unchecked,
+      );
+
+      await tester.tap(checkboxFinder);
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<Checkbox>(checkboxFinder).state,
+        CheckboxState.checked,
+      );
+      expect(store.value, persistedSettings);
+      slimg.lastPreviewRequest!.operation.when(
+        convert: (options) {
+          expect(options.targetFormat, 'jxl');
+          expect(options.jxlEncoder, JxlEncoderPreference.preferGjxl);
+        },
+        optimize: (_) => fail('expected convert'),
+        resize: (_) => fail('unexpected resize'),
+        crop: (_) => fail('unexpected crop'),
+        extend: (_) => fail('unexpected extend'),
+      );
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(MyApp)),
+      );
+      await container
+          .read(analyzeRunControllerProvider.notifier)
+          .startAnalyze();
+      await tester.pump();
+      slimg.lastAnalyzeRequest!.operation.when(
+        convert: (options) {
+          expect(options.targetFormat, 'jxl');
+          expect(options.jxlEncoder, JxlEncoderPreference.preferGjxl);
+        },
+        optimize: (_) => fail('expected convert'),
+        resize: (_) => fail('unexpected resize'),
+        crop: (_) => fail('unexpected crop'),
+        extend: (_) => fail('unexpected extend'),
+      );
+      await tester.pumpAndSettle();
+
+      await container
+          .read(optimizationRunControllerProvider.notifier)
+          .optimizeSelected();
+      await tester.pump();
+      final queuedOperation = slimg.lastBatchRequest!.requests.single.operation;
+      queuedOperation.when(
+        convert: (options) {
+          expect(options.targetFormat, 'jxl');
+          expect(options.jxlEncoder, JxlEncoderPreference.preferGjxl);
+        },
+        optimize: (_) => fail('expected convert'),
+        resize: (_) => fail('unexpected resize'),
+        crop: (_) => fail('unexpected crop'),
+        extend: (_) => fail('unexpected extend'),
+      );
+    },
+  );
+
+  testWidgets(
     'optimized format value bolds briefly when codec choice changes',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1400, 1000));
@@ -5078,13 +5172,17 @@ class _FakeSlimgApi implements SlimgApi {
     this.previewDelay = Duration.zero,
     this.batchDelay = Duration.zero,
     this.batchFailurePaths = const <String>{},
+    this.gjxlBackendAvailable = false,
   }) : inspectResults = inspectResults ?? {};
 
   final Map<String, ImageMetadata> inspectResults;
   final Duration previewDelay;
   final Duration batchDelay;
   final Set<String> batchFailurePaths;
+  final bool gjxlBackendAvailable;
+  PreviewFileRequest? lastPreviewRequest;
   ProcessFileBatchRequest? lastBatchRequest;
+  AnalyzeFileRequest? lastAnalyzeRequest;
   bool lastTimingLogsEnabled = false;
   int previewCallCount = 0;
   int differenceCallCount = 0;
@@ -5098,6 +5196,9 @@ class _FakeSlimgApi implements SlimgApi {
   final Map<String, _FakeAnalyzeJob> _analyzeJobs = {};
 
   int get analyzeJobCount => _analyzeJobs.length;
+
+  @override
+  bool gjxlBackendCompiled() => gjxlBackendAvailable;
 
   static final Uint8List _previewBytes = base64Decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==',
@@ -5121,6 +5222,7 @@ class _FakeSlimgApi implements SlimgApi {
   Future<PreviewResult> previewFile({
     required PreviewFileRequest request,
   }) async {
+    lastPreviewRequest = request;
     previewCallCount += 1;
     if (previewDelay > Duration.zero) {
       await Future<void>.delayed(previewDelay);
@@ -5301,6 +5403,7 @@ class _FakeSlimgApi implements SlimgApi {
   Future<AnalyzeFileJobHandle> startAnalyzeFileJob({
     required AnalyzeFileRequest request,
   }) async {
+    lastAnalyzeRequest = request;
     final jobId = 'analyze-${++_nextAnalyzeJobId}';
     final snapshot = AnalyzeFileJobSnapshot(
       jobId: jobId,

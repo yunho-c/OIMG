@@ -170,6 +170,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ImageOperation dco_decode_image_operation(dynamic raw);
 
   @protected
+  JxlEncoderPreference dco_decode_jxl_encoder_preference(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
@@ -475,6 +478,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ImageOperation sse_decode_image_operation(SseDeserializer deserializer);
+
+  @protected
+  JxlEncoderPreference sse_decode_jxl_encoder_preference(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
@@ -859,6 +867,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_image_operation(
     ImageOperation self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_jxl_encoder_preference(
+    JxlEncoderPreference self,
     SseSerializer serializer,
   );
 

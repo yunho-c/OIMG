@@ -6,10 +6,14 @@ use std::time::{Duration, Instant};
 
 use oimg_rust::api::bridge::{
     self, AnalyzeFileRequest, BatchJobState, BatchProcessRequest, ConvertOptions, CropOptions,
-    CropSpec, ImageOperation, OptimizeOptions, PreviewArtifactRequest, PreviewFileRequest,
-    ProcessBytesRequest, ProcessFileBatchRequest, ProcessFileRequest, ResizeOptions, ResizeSpec,
+    CropSpec, ImageOperation, JxlEncoderPreference, OptimizeOptions, PreviewArtifactRequest,
+    PreviewFileRequest, ProcessBytesRequest, ProcessFileBatchRequest, ProcessFileRequest,
+    ResizeOptions, ResizeSpec,
 };
-use slimg_core::{convert, decode, Format, ImageData, PipelineOptions};
+use slimg_core::{
+    convert, decode, Format, ImageData, JxlEncoderPreference as CoreJxlEncoderPreference,
+    PipelineOptions,
+};
 use tempfile::tempdir;
 
 fn test_image() -> ImageData {
@@ -38,6 +42,7 @@ fn png_bytes() -> Vec<u8> {
             quality: 80,
             effort: None,
             png_palette: Default::default(),
+            jxl_encoder: CoreJxlEncoderPreference::Libjxl,
             threads: None,
             resize: None,
             crop: None,
@@ -57,6 +62,7 @@ fn png_bytes_with_size(width: u32, height: u32) -> Vec<u8> {
             quality: 80,
             effort: None,
             png_palette: Default::default(),
+            jxl_encoder: CoreJxlEncoderPreference::Libjxl,
             threads: None,
             resize: None,
             crop: None,
@@ -150,6 +156,7 @@ fn inspect_and_preview_file_decode_heic_with_imageio() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
     })
     .unwrap();
@@ -175,6 +182,7 @@ fn process_bytes_converts_to_webp() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
     })
     .unwrap();
@@ -200,6 +208,7 @@ fn preview_file_crops_without_writing() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
     })
     .unwrap();
@@ -225,6 +234,7 @@ fn preview_file_converts_to_avif_with_metrics() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
     })
     .unwrap();
@@ -255,6 +265,7 @@ fn preview_metric_rpcs_return_values_for_same_dimension_preview() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
     })
     .unwrap();
@@ -310,6 +321,7 @@ fn preview_metric_rpcs_return_none_when_metric_cannot_be_computed() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
     })
     .unwrap();
@@ -350,6 +362,7 @@ fn dispose_preview_artifact_invalidates_followup_requests() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
     })
     .unwrap();
@@ -385,6 +398,7 @@ fn process_file_derives_suffixed_output_when_overwrite_is_false() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
     })
     .unwrap();
@@ -417,6 +431,7 @@ fn process_file_reports_skipped_write_when_optimized_result_is_not_smaller() {
             quality: 100,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
             write_only_if_smaller: true,
         }),
     })
@@ -450,6 +465,7 @@ fn process_files_returns_ordered_partial_failures() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
         continue_on_error: true,
     })
@@ -487,6 +503,7 @@ fn process_file_batch_supports_mixed_operations() {
                     quality: 80,
                     effort: None,
                     png_palette: None,
+                    jxl_encoder: JxlEncoderPreference::Libjxl,
                     write_only_if_smaller: true,
                 }),
             },
@@ -502,6 +519,7 @@ fn process_file_batch_supports_mixed_operations() {
                     quality: 80,
                     effort: None,
                     png_palette: None,
+                    jxl_encoder: JxlEncoderPreference::Libjxl,
                 }),
             },
         ],
@@ -544,6 +562,7 @@ fn process_file_batch_job_reports_progress_and_can_be_disposed() {
                     quality: 80,
                     effort: None,
                     png_palette: None,
+                    jxl_encoder: JxlEncoderPreference::Libjxl,
                 }),
             },
             ProcessFileRequest {
@@ -558,6 +577,7 @@ fn process_file_batch_job_reports_progress_and_can_be_disposed() {
                     quality: 80,
                     effort: None,
                     png_palette: None,
+                    jxl_encoder: JxlEncoderPreference::Libjxl,
                 }),
             },
         ],
@@ -613,6 +633,7 @@ fn cancel_process_file_batch_job_stops_remaining_files() {
                 quality: 90,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: JxlEncoderPreference::Libjxl,
             }),
         });
     }
@@ -651,6 +672,7 @@ fn analyze_file_job_returns_sweep_samples() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
         }),
         qualities: vec![0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
     })
@@ -685,6 +707,7 @@ fn dispose_analyze_file_job_cleans_temp_outputs() {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: JxlEncoderPreference::Libjxl,
             write_only_if_smaller: true,
         }),
         qualities: vec![0, 50, 100],

@@ -951,6 +951,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4271d37baee1b8c7e4b708028c57d816cf9d2434acb33a549475f78c181f6253"
 
 [[package]]
+name = "gjxl"
+version = "0.0.1"
+source = "git+https://github.com/yunho-c/gjxl?rev=17788237f6585d43a1dea6601bf27ca444d2bce8#17788237f6585d43a1dea6601bf27ca444d2bce8"
+dependencies = [
+ "gjxl-sys",
+]
+
+[[package]]
+name = "gjxl-sys"
+version = "0.0.1"
+source = "git+https://github.com/yunho-c/gjxl?rev=17788237f6585d43a1dea6601bf27ca444d2bce8#17788237f6585d43a1dea6601bf27ca444d2bce8"
+dependencies = [
+ "bindgen",
+ "cmake",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2015,6 +2032,7 @@ dependencies = [
 name = "slimg-core"
 version = "0.5.1"
 dependencies = [
+ "gjxl",
  "image",
  "imagequant",
  "imgref",

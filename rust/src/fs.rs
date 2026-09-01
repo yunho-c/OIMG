@@ -192,6 +192,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
                 write_only_if_smaller: true,
             }),
             Format::Jpeg,
@@ -212,6 +213,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             }),
             Format::WebP,
         )
@@ -232,6 +234,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             }),
             Format::Jpeg,
         )

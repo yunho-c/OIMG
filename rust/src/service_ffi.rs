@@ -12,8 +12,8 @@ use crate::error::{panic_message, Result, SlimgBridgeError};
 use crate::fs::safe_write_bytes;
 use crate::source_image::decode_source_image;
 use crate::types::{
-    BatchItemResult, ConvertOptions, ImageOperation, OptimizeOptions, PngPaletteMode,
-    ProcessFileBatchRequest, ProcessFileRequest, ProcessResult,
+    BatchItemResult, ConvertOptions, ImageOperation, JxlEncoderPreference, OptimizeOptions,
+    PngPaletteMode, ProcessFileBatchRequest, ProcessFileRequest, ProcessResult,
 };
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -228,6 +228,7 @@ fn build_batch_request(request: CompressionServiceRequest) -> Result<ProcessFile
                 quality: settings.quality,
                 effort: settings.effort,
                 png_palette: settings.png_palette_mode,
+                jxl_encoder: JxlEncoderPreference::Libjxl,
                 write_only_if_smaller: true,
             })
         } else {
@@ -236,6 +237,7 @@ fn build_batch_request(request: CompressionServiceRequest) -> Result<ProcessFile
                 quality: settings.quality,
                 effort: settings.effort,
                 png_palette: settings.png_palette_mode,
+                jxl_encoder: JxlEncoderPreference::Libjxl,
             })
         };
 
@@ -309,6 +311,7 @@ fn process_save_as_path(
                     quality: 80,
                     effort: None,
                     png_palette: None,
+                    jxl_encoder: JxlEncoderPreference::Libjxl,
                 }),
             },
             None,
@@ -348,6 +351,7 @@ fn process_save_as_jpg(
             quality: settings.quality,
             effort: settings.effort,
             png_palette: Default::default(),
+            jxl_encoder: slimg_core::JxlEncoderPreference::Libjxl,
             threads: None,
         },
     )?;
@@ -491,6 +495,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: Default::default(),
+                jxl_encoder: slimg_core::JxlEncoderPreference::Libjxl,
                 threads: None,
                 resize: None,
                 crop: None,
@@ -511,6 +516,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: Default::default(),
+                jxl_encoder: slimg_core::JxlEncoderPreference::Libjxl,
                 threads: None,
                 resize: None,
                 crop: None,
@@ -596,6 +602,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: Default::default(),
+                jxl_encoder: slimg_core::JxlEncoderPreference::Libjxl,
                 threads: None,
                 resize: None,
                 crop: None,

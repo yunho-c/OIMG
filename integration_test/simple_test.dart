@@ -82,6 +82,9 @@ class _NoopFileOpenChannel implements FileOpenChannel {
 
 class _FakeSlimgApi implements SlimgApi {
   @override
+  bool gjxlBackendCompiled() => false;
+
+  @override
   void setTimingLogsEnabled({required bool enabled}) {}
 
   @override

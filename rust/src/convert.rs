@@ -388,6 +388,7 @@ fn run_operation(
                 quality: validate_quality(options.quality)?,
                 effort: validate_effort(options.effort)?,
                 png_palette: map_png_palette(options.png_palette),
+                jxl_encoder: options.jxl_encoder.to_core(),
                 threads,
                 resize: Some(map_resize_spec(&options.resize)?),
                 crop: None,
@@ -401,6 +402,7 @@ fn run_operation(
                 quality: validate_quality(options.quality)?,
                 effort: validate_effort(options.effort)?,
                 png_palette: map_png_palette(options.png_palette),
+                jxl_encoder: options.jxl_encoder.to_core(),
                 threads,
                 resize: None,
                 crop: Some(map_crop_spec(&options.crop)?),
@@ -414,6 +416,7 @@ fn run_operation(
                 quality: validate_quality(options.quality)?,
                 effort: validate_effort(options.effort)?,
                 png_palette: map_png_palette(options.png_palette),
+                jxl_encoder: options.jxl_encoder.to_core(),
                 threads,
                 resize: None,
                 crop: None,
@@ -443,6 +446,7 @@ pub(crate) fn run_preview_operation(
                     quality,
                     effort,
                     png_palette: map_png_palette(options.png_palette),
+                    jxl_encoder: options.jxl_encoder.to_core(),
                     threads: encode_threads,
                     resize: None,
                     crop: None,
@@ -463,6 +467,7 @@ pub(crate) fn run_preview_operation(
                     quality,
                     effort,
                     png_palette: map_png_palette(options.png_palette),
+                    jxl_encoder: options.jxl_encoder.to_core(),
                     threads: encode_threads_for_format(source_core_format, threads),
                 },
             )?;
@@ -478,6 +483,7 @@ pub(crate) fn run_preview_operation(
                     quality: validate_quality(options.quality)?,
                     effort: validate_effort(options.effort)?,
                     png_palette: map_png_palette(options.png_palette),
+                    jxl_encoder: options.jxl_encoder.to_core(),
                     threads: encode_threads_for_format(target_format, threads),
                     resize: Some(map_resize_spec(&options.resize)?),
                     crop: None,
@@ -497,6 +503,7 @@ pub(crate) fn run_preview_operation(
                     quality: validate_quality(options.quality)?,
                     effort: validate_effort(options.effort)?,
                     png_palette: map_png_palette(options.png_palette),
+                    jxl_encoder: options.jxl_encoder.to_core(),
                     threads: encode_threads_for_format(target_format, threads),
                     resize: None,
                     crop: Some(map_crop_spec(&options.crop)?),
@@ -516,6 +523,7 @@ pub(crate) fn run_preview_operation(
                     quality: validate_quality(options.quality)?,
                     effort: validate_effort(options.effort)?,
                     png_palette: map_png_palette(options.png_palette),
+                    jxl_encoder: options.jxl_encoder.to_core(),
                     threads: encode_threads_for_format(target_format, threads),
                     resize: None,
                     crop: None,
@@ -553,6 +561,7 @@ fn convert_bytes(
             quality,
             effort,
             png_palette: map_png_palette(options.png_palette),
+            jxl_encoder: options.jxl_encoder.to_core(),
             threads: encode_threads_for_format(target_format, threads),
             resize: None,
             crop: None,
@@ -592,6 +601,7 @@ fn optimize_bytes(
             quality,
             effort,
             png_palette: map_png_palette(options.png_palette),
+            jxl_encoder: options.jxl_encoder.to_core(),
             threads: encode_threads_for_format(format, threads),
         },
     )?;
@@ -861,6 +871,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: Default::default(),
+                jxl_encoder: slimg_core::JxlEncoderPreference::Libjxl,
                 threads: None,
                 resize: None,
                 crop: None,
@@ -913,12 +924,14 @@ mod tests {
             quality: 100,
             effort: None,
             png_palette: Some(PngPaletteMode::Off),
+            jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             write_only_if_smaller: true,
         });
         let png_auto = ImageOperation::Optimize(OptimizeOptions {
             quality: 100,
             effort: None,
             png_palette: Some(PngPaletteMode::Auto),
+            jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             write_only_if_smaller: true,
         });
         let jpeg = ImageOperation::Convert(ConvertOptions {
@@ -926,6 +939,7 @@ mod tests {
             quality: 80,
             effort: None,
             png_palette: None,
+            jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
         });
 
         assert!(should_analyze_palette_for_preview(&png_off, source_format).unwrap());
@@ -942,6 +956,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             }),
         })
         .unwrap();
@@ -959,12 +974,49 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             }),
         })
         .unwrap();
 
         assert_eq!(result.format, "avif");
         assert_eq!(&result.encoded_bytes[4..8], b"ftyp");
+    }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[test]
+    fn prefer_gjxl_request_uses_the_compiled_backend_with_oimg_thread_budget() {
+        use slimg_core::codec::jxl::{encode_with_diagnostics, JxlEncodeBackend};
+
+        assert!(crate::api::bridge::gjxl_backend_compiled());
+        let thread_budget = encode_threads_for_format(Format::Jxl, None);
+        let outcome = encode_with_diagnostics(
+            &test_image(),
+            &EncodeOptions {
+                quality: 80,
+                effort: None,
+                png_palette: Default::default(),
+                jxl_encoder: slimg_core::JxlEncoderPreference::PreferGjxl,
+                threads: thread_budget,
+            },
+        )
+        .unwrap();
+        assert_eq!(outcome.backend, JxlEncodeBackend::Gjxl);
+
+        let result = process_bytes(ProcessBytesRequest {
+            data: test_png_bytes(),
+            operation: ImageOperation::Convert(ConvertOptions {
+                target_format: "jxl".to_string(),
+                quality: 80,
+                effort: None,
+                png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::PreferGjxl,
+            }),
+        })
+        .unwrap();
+
+        assert_eq!(result.format, "jxl");
+        assert!(!result.encoded_bytes.is_empty());
     }
 
     #[test]
@@ -978,6 +1030,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             }),
             None,
         )
@@ -1002,6 +1055,7 @@ mod tests {
                 quality: 0,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             }),
             None,
         )
@@ -1034,6 +1088,7 @@ mod tests {
                 quality: 80,
                 effort: None,
                 png_palette: None,
+                jxl_encoder: crate::types::JxlEncoderPreference::Libjxl,
             }),
         })
         .unwrap_err();

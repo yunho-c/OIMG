@@ -22,6 +22,9 @@ tempfile = "3.23.0"
 thiserror = "2.0.17"
 tjdistler-iqa = { path = "../../tjdistler-iqa-fork" }
 
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+slimg-core = { path = "../../slimg/crates/slimg-core", features = ["jxl-encoder-gjxl"] }
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
 
