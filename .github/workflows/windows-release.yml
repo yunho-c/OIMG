@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: yunho-c/slimg
-          ref: main
+          ref: 7e39c9353c2c0c493245a53ec7574e39b23a9ed4
           path: slimg
           token: ${{ secrets.CI_REPO_TOKEN }}
           submodules: recursive

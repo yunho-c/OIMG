@@ -106,6 +106,6 @@ Before publishing the draft:
 ## Notes
 
 - The package is not GPG-signed and is not an apt repository artifact yet.
-- The workflow currently checks out sibling repos from the branches used by this app: `slimg` from `main`, `tjdistler-iqa-fork` from `perf/simd-gaussian-vertical`, and `irondash` from `fix/macos-engine-context-race`.
+- The workflow pins `slimg` to commit `7e39c9353c2c0c493245a53ec7574e39b23a9ed4`, while `tjdistler-iqa-fork` uses `perf/simd-gaussian-vertical` and `irondash` uses `fix/macos-engine-context-race`.
 - For more reproducible releases, later pin those sibling checkouts to tags or commit SHAs.
 - For `arm64` Linux releases, add a native ARM runner or a dedicated cross-build workflow instead of relying on the current `ubuntu-24.04` hosted runner.

@@ -30,6 +30,6 @@ Follow-up: make the APT publish workflow run after a successful Linux Debian rel
 
 ## Release dependency pinning
 
-The release workflows currently checkout sibling repositories from the branches used by this app.
+The release workflows pin `slimg` to the experimental GJXL integration commit while the other sibling repositories still follow their integration branches.
 
-Follow-up: pin `slimg`, `tjdistler-iqa-fork`, and `irondash` to release tags or commit SHAs before publishing stable releases, so release rebuilds do not silently pick up branch changes.
+Follow-up: pin `tjdistler-iqa-fork` and `irondash` to release tags or commit SHAs before publishing stable releases, and replace Slimg's experimental commit pin with its stable release tag or commit.
