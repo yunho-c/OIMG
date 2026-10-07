@@ -16,8 +16,8 @@ imagesize = { version = "0.15.0", default-features = false, features = ["heif", 
 img-parts = "0.4.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
-slimg-core = { path = "../../slimg/crates/slimg-core", features = ["pngquant"] }
-slimg-exec = { path = "../../slimg/crates/slimg-exec" }
+slimg-core = { path = "../../slimg/crates/slimg-core", default-features = false, features = ["pngquant", "jpeg-backend-jpegli"] }
+slimg-exec = { path = "../../slimg/crates/slimg-exec", default-features = false, features = ["jpeg-backend-jpegli"] }
 tempfile = "3.23.0"
 thiserror = "2.0.17"
 tjdistler-iqa = { path = "../../tjdistler-iqa-fork" }
